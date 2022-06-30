@@ -1,0 +1,29 @@
+---
+name: PointDet
+channels:
+  - pytorch
+  - nvidia/label/cuda-11.6.2
+  - conda-forge
+dependencies:
+  - cudatoolkit=11.6
+  - pip
+  - python=3.9
+  - pytorch
+  - tensorboard
+  - tqdm
+  # Linter
+  - autoflake
+  - black
+  - cppcheck
+  - isort
+  - pylint
+  - yamllint
+  # Toolchain
+  - clang-tools
+  - cuda-toolkit
+  - debugpy
+  - gxx=11
+  - ninja
+  - wget
+  - pip:
+      - hydra-core

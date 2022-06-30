@@ -11,13 +11,13 @@ version = '0.0.0'
 [tool.black]
 line-length = 100
 
+[tool.pylint.design]
+max-args = 10
+
 [tool.pylint.messages_control]
 disable = ['missing-docstring']
 
-[tool.pylint.DESIGN]
-max-args = 10
-
-[tool.pylint.TYPECHECK]
+[tool.pylint.typecheck]
 generated-members = 'numpy.*,torch.*'
 
 [tool.isort]

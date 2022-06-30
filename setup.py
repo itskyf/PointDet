@@ -38,7 +38,7 @@ def get_extensions():
         sources=sources,
         include_dirs=[ext_dir],
         define_macros=define_macros,
-        extra_compile_args={"cxx": ["-std=c++17"], "nvcc": ["-std=c++14"]},
+        extra_compile_args={"cxx": ["-std=c++17"], "nvcc": ["-std=c++17"]},
     )
 
 

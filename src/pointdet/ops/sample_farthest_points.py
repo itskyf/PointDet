@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 from random import randint
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Union
 
 import torch
 
@@ -17,9 +17,9 @@ from .utils import masked_gather
 def sample_farthest_points(
     points: torch.Tensor,
     lengths: Optional[torch.Tensor] = None,
-    K: Union[int, List[int], torch.Tensor] = 50,
+    K: Union[int, list[int], torch.Tensor] = 50,
     random_start_point: bool = False,
-) -> Tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Iterative farthest point sampling algorithm [1] to subsample a set of
     K points from a given pointcloud. At each iteration, a point is selected
@@ -96,9 +96,9 @@ def sample_farthest_points(
 def sample_farthest_points_naive(
     points: torch.Tensor,
     lengths: Optional[torch.Tensor] = None,
-    K: Union[int, List[int], torch.Tensor] = 50,
+    K: Union[int, list[int], torch.Tensor] = 50,
     random_start_point: bool = False,
-) -> Tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Same Args/Returns as sample_farthest_points
     """

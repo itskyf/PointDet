@@ -6,6 +6,8 @@ channels:
   - conda-forge
 dependencies:
   - cudatoolkit=11.6
+  - numba
+  - pillow
   - pip
   - python=3.9
   - pytorch
@@ -24,7 +26,6 @@ dependencies:
   - debugpy
   - gxx=11
   - ninja
-  - wget
   - pip:
       - git+https://github.com/facebookresearch/hydra#subdirectory=contrib/hydra_torchrun_launcher
       - hydra-core

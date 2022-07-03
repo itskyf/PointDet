@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import NamedTuple, Optional
 
 import numpy as np
-import torch
 from numpy.typing import NDArray
 
 from ..core.bbox import box_np_ops
@@ -15,7 +14,7 @@ from .utils import box_collision_test
 DBInfos = dict[str, list[DBInfo]]
 
 
-class GTSampled(NamedTuple):
+class DBSamples(NamedTuple):
     bboxes_3d: NDArray[np.float32]
     labels_3d: NDArray[np.int32]
     points: NDArray[np.float32]
@@ -129,7 +128,7 @@ class DBSampler:
 
     def __call__(
         self, gt_bboxes: NDArray[np.float32], gt_labels: NDArray[np.int32]
-    ) -> Optional[GTSampled]:
+    ) -> Optional[DBSamples]:
         """Sampling all categories of bboxes.
 
         Args:
@@ -182,7 +181,7 @@ class DBSampler:
         sampled_labels = np.array([self.name2label[info.name] for info in sampled], dtype=np.int32)
         points = np.concatenate(sampled_pts_list)
         group_ids = np.arange(gt_bboxes.shape[0], gt_bboxes.shape[0] + len(sampled))
-        return GTSampled(sampled_bboxes, sampled_labels, points, group_ids)
+        return DBSamples(sampled_bboxes, sampled_labels, points, group_ids)
 
     @staticmethod
     def filter_by_difficulty(db_infos: DBInfos, del_difficulties: list[int]) -> DBInfos:
@@ -308,8 +307,9 @@ class GTSampler:
         # TODO use ground_plane
         # change to float for blending operation
         # TODO sample 2D
-        sampled: Optional[GTSampled] = self.db_sampler(gt_bboxes_3d, gt_labels_3d)
+        sampled: Optional[DBSamples] = self.db_sampler(gt_bboxes_3d, gt_labels_3d)
         if sampled is not None:
+            # Add sampled boxes to scene
             pt_cloud.bboxes_3d = LiDARBoxes3D(np.concatenate([gt_bboxes_3d, sampled.bboxes_3d]))
             pt_cloud.labels_3d = np.concatenate([gt_labels_3d, sampled.labels_3d])
             points = self._remove_points_in_boxes(pt_cloud.points, sampled.bboxes_3d)

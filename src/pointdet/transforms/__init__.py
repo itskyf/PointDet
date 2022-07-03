@@ -1,4 +1,4 @@
 from .compose import Compose
-from .gt_sampling import DBSampler
+from .gt_sampling import GTSampler
 
-__all__ = ["Compose", "DBSampler"]
+__all__ = ["Compose", "GTSampler"]

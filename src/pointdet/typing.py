@@ -12,6 +12,7 @@ from .core.bbox.structures import LiDARBoxes3D
 @dataclass
 class BoxAnnotation:
     bboxes_3d: LiDARBoxes3D
+    labels_3d: NDArray[np.int32]
     bboxes: torch.Tensor
     labels: NDArray[np.int32]
     names: NDArray[np.str_]

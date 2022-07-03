@@ -71,8 +71,9 @@ class KittiDataset(IDataset):
 
         labels = [self.CLASSES.index(name) if name in self.CLASSES else -1 for name in annos.names]
         labels = np.array(labels, dtype=np.int32)
+        labels_3d = labels.copy()
         return BoxAnnotation(
-            bboxes_3d, bboxes, labels, annos.names, annos.difficulty, annos.group_ids
+            bboxes_3d, labels_3d, bboxes, labels, annos.names, annos.difficulty, annos.group_ids
         )
 
 

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -12,12 +12,11 @@ from .core.bbox.structures import LiDARBoxes3D
 @dataclass
 class BoxAnnotation:
     bboxes_3d: LiDARBoxes3D
-    labels_3d: NDArray[np.int32]
-    bboxes: torch.Tensor
     labels: NDArray[np.int32]
-    names: NDArray[np.str_]
+    bboxes: NDArray[np.float32]
     difficulty: NDArray[np.int32]
     group_ids: NDArray[np.int32]
+    names: NDArray[np.str_]
     # TODO plane_lidar
 
 
@@ -25,8 +24,15 @@ class BoxAnnotation:
 class PointCloud:
     sample_idx: int
     lidar2img: NDArray[np.float32]
-    points: torch.Tensor
+    points: NDArray[np.float32]
     annos: Optional[BoxAnnotation]
+    bboxes_3d: LiDARBoxes3D = field(init=False)
+    labels_3d: NDArray[np.int32] = field(init=False)
+
+    def __post_init__(self):
+        if self.annos is not None:
+            self.bboxes_3d = self.annos.bboxes_3d
+            self.labels_3d = self.annos.labels
 
 
 @dataclass

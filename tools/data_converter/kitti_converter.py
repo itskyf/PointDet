@@ -215,7 +215,7 @@ def _get_label_anno(
     num_gt = len(names)
     num_obj = num_gt - names.count("DontCare")
 
-    index = np.concatenate((np.arange(num_obj), np.full(num_gt - num_obj, -1)), dtype=np.int32)
+    index = np.concatenate([np.arange(num_obj), np.full(num_gt - num_obj, -1)], dtype=np.int32)
     group_ids = np.arange(num_gt, dtype=np.int32)
     truncated = np.array([float(x[1]) for x in content], dtype=np.float32)
     occluded = np.array([int(x[2]) for x in content], dtype=np.int32)
@@ -244,7 +244,7 @@ def _get_label_anno(
     gt_boxes_lidar = kitti_ops.box_camera_to_lidar(gt_boxes_camera, rect, trv2c)
     indices = box_np_ops.points_in_rbbox(points[:, :3], gt_boxes_lidar)
     ignored = np.full(len(dimensions) - num_obj, fill_value=-1, dtype=np.int32)
-    num_gt_points = np.concatenate((indices.sum(axis=0), ignored), dtype=np.int32)
+    num_gt_points = np.concatenate([indices.sum(axis=0), ignored], dtype=np.int32)
 
     return KittiAnnotation(
         index,

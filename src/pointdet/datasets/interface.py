@@ -37,5 +37,5 @@ class IDataset(Dataset):
         return len(self.infos)
 
     @abc.abstractmethod
-    def _getitem_impl(self, index: int) -> PointCloud:
+    def _getitem_impl(self, info) -> PointCloud:
         ...

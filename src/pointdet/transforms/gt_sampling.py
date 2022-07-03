@@ -128,7 +128,7 @@ class DBSampler:
         }
 
     def __call__(
-        self, gt_bboxes3d: NDArray[np.float32], gt_labels: NDArray[np.int32]
+        self, gt_bboxes: NDArray[np.float32], gt_labels: NDArray[np.int32]
     ) -> Optional[GTSampled]:
         """Sampling all categories of bboxes.
 
@@ -155,7 +155,7 @@ class DBSampler:
 
         sampled: list[DBInfo] = []
         sampled_bboxes = []
-        avoid_coll_boxes = gt_bboxes3d
+        avoid_coll_boxes = gt_bboxes
 
         for cls_name, num_sample in num_sample_dict.items():
             sampled_cls = self._sample_class_v2(cls_name, num_sample, avoid_coll_boxes)
@@ -167,21 +167,21 @@ class DBSampler:
                     else np.stack([db_info.box3d_lidar for db_info in sampled_cls])
                 )
                 sampled_bboxes.append(sampled_box)
-                avoid_coll_boxes = np.concatenate((avoid_coll_boxes, sampled_box))
+                avoid_coll_boxes = np.concatenate([avoid_coll_boxes, sampled_box])
 
         if len(sampled) == 0:
             return None
 
-        sampled_pts = []
+        sampled_pts_list = []
         for info in sampled:
             points = np.load(self.data_root / info.path)
             points[:, :3] += info.box3d_lidar[:3]
-            sampled_pts.append(points)
+            sampled_pts_list.append(points)
         # TODO ground_plane
         sampled_bboxes = np.concatenate(sampled_bboxes)
         sampled_labels = np.array([self.name2label[info.name] for info in sampled], dtype=np.int32)
-        points = np.concatenate(sampled_pts)
-        group_ids = np.arange(gt_bboxes3d.shape[0], gt_bboxes3d.shape[0] + len(sampled))
+        points = np.concatenate(sampled_pts_list)
+        group_ids = np.arange(gt_bboxes.shape[0], gt_bboxes.shape[0] + len(sampled))
         return GTSampled(sampled_bboxes, sampled_labels, points, group_ids)
 
     @staticmethod
@@ -237,14 +237,14 @@ class DBSampler:
         )
 
         sp_boxes = np.stack([db_info.box3d_lidar for db_info in sampled])
-        boxes = np.concatenate((gt_bboxes, sp_boxes))
+        boxes = np.concatenate([gt_bboxes, sp_boxes])
 
         sp_boxes_new = boxes[gt_bboxes.shape[0] :]
         sp_boxes_bv = box_np_ops.center_to_corner_box2d(
             sp_boxes_new[:, 0:2], sp_boxes_new[:, 3:5], sp_boxes_new[:, 6]
         )
 
-        total_bv = np.concatenate((gt_bboxes_bv, sp_boxes_bv))
+        total_bv = np.concatenate([gt_bboxes_bv, sp_boxes_bv])
         coll_mat = box_collision_test(total_bv, total_bv)
         diag = np.arange(total_bv.shape[0])
         coll_mat[diag, diag] = False
@@ -275,7 +275,9 @@ class GTSampler:
         self.db_sampler = db_sampler
 
     @staticmethod
-    def _remove_points_in_boxes(points: torch.Tensor, boxes) -> torch.Tensor:
+    def _remove_points_in_boxes(
+        points: NDArray[np.float32], boxes: NDArray[np.float32]
+    ) -> NDArray[np.float32]:
         """Remove the points in the sampled bounding boxes.
 
         Args:
@@ -285,7 +287,7 @@ class GTSampler:
         Returns:
             np.ndarray: Points with those in the boxes removed.
         """
-        xyz = points[:, :3].numpy()
+        xyz = points[:, :3]
         masks = box_np_ops.points_in_rbbox(xyz, boxes)
         return points[np.logical_not(masks.any(-1))]
 
@@ -300,19 +302,17 @@ class GTSampler:
                 'points', 'gt_bboxes_3d', 'gt_labels_3d' keys are updated
                 in the result dict.
         """
-        annos = pt_cloud.annos
-        assert annos is not None, "No GT in sample"
-        gt_bboxes_3d = annos.bboxes_3d.tensor.numpy()
-        gt_labels_3d = annos.labels_3d
+        gt_bboxes_3d = pt_cloud.bboxes_3d.tensor.numpy()
+        gt_labels_3d = pt_cloud.labels_3d
 
         # TODO use ground_plane
         # change to float for blending operation
         # TODO sample 2D
         sampled: Optional[GTSampled] = self.db_sampler(gt_bboxes_3d, gt_labels_3d)
         if sampled is not None:
-            annos.bboxes_3d = LiDARBoxes3D(np.concatenate((gt_bboxes_3d, sampled.bboxes_3d)))
-            annos.labels_3d = np.concatenate((gt_labels_3d, sampled.labels_3d), dtype=np.int32)
+            pt_cloud.bboxes_3d = LiDARBoxes3D(np.concatenate([gt_bboxes_3d, sampled.bboxes_3d]))
+            pt_cloud.labels_3d = np.concatenate([gt_labels_3d, sampled.labels_3d])
             points = self._remove_points_in_boxes(pt_cloud.points, sampled.bboxes_3d)
-            pt_cloud.points = torch.from_numpy(np.concatenate((sampled.points, points)))
+            pt_cloud.points = np.concatenate([sampled.points, points])
 
         return pt_cloud

@@ -45,7 +45,7 @@ def box_camera_to_lidar(data, r_rect, velo2cam):
     xyz_lidar = camera_to_lidar(data[:, 0:3], r_rect, velo2cam)
     # yaw and dims also needs to be converted
     r_new = limit_period(-data[:, 6:7] - np.pi / 2, period=np.pi * 2)
-    return np.concatenate((xyz_lidar, x_size, z_size, y_size, r_new), axis=1)
+    return np.concatenate([xyz_lidar, x_size, z_size, y_size, r_new], axis=1)
 
 
 def camera_to_lidar(points, r_rect, velo2cam):
@@ -101,8 +101,8 @@ def get_frustum(
         [fku / near_clip, -fkv / near_clip], dtype=cam_intrinsic.dtype
     )
     far_box_corners = lhs / np.array([fku / far_clip, -fkv / far_clip], dtype=cam_intrinsic.dtype)
-    ret_xy = np.concatenate((near_box_corners, far_box_corners))  # [8, 2]
-    return np.concatenate((ret_xy, z_points), axis=1)  # ret_xyz
+    ret_xy = np.concatenate([near_box_corners, far_box_corners])  # [8, 2]
+    return np.concatenate([ret_xy, z_points], axis=1)  # ret_xyz
 
 
 def projection_matrix_to_crt_kitti(proj: NDArray[np.float32]):

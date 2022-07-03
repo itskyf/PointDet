@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Callable, Optional
 
 import numpy as np
-import torch
 from numpy.typing import NDArray
 
 from ...core.bbox.structures import CameraBoxes3D, LiDARBoxes3D
@@ -39,7 +38,7 @@ class KittiDataset(IDataset):
             annos = self._get_annotation(info.annos, rect, trv2c) if self.training else None
 
         v_path = self.root_split / self.pts_prefix / f"{info.sample_idx:06d}.bin"
-        points = torch.from_numpy(np.fromfile(v_path, dtype=np.float32))
+        points = np.fromfile(v_path, dtype=np.float32)
         points = points.reshape(-1, 4)
         return PointCloud(info.sample_idx, lidar2img, points, annos)
 
@@ -62,18 +61,14 @@ class KittiDataset(IDataset):
         # TODO maybe use index to get the annos, thus the evalhook could also use this api
         annos = _remove_annos_names(annos, "DontCare")
         rots = annos.rotation_y[..., np.newaxis]
-        cam_bboxes_3d = CameraBoxes3D(
-            torch.from_numpy(np.concatenate((annos.location, annos.dimensions, rots), axis=1))
-        )
-        bboxes_3d = LiDARBoxes3D.from_camera_box3d(cam_bboxes_3d, rect, trv2c)
-        bboxes = torch.from_numpy(annos.bbox)
+        bboxes_3d = CameraBoxes3D(np.concatenate([annos.location, annos.dimensions, rots], axis=1))
+        bboxes_3d = LiDARBoxes3D.from_camera_box3d(bboxes_3d, rect, trv2c)
         # TODO process when there is plane
 
         labels = [self.CLASSES.index(name) if name in self.CLASSES else -1 for name in annos.names]
         labels = np.array(labels, dtype=np.int32)
-        labels_3d = labels.copy()
         return BoxAnnotation(
-            bboxes_3d, labels_3d, bboxes, labels, annos.names, annos.difficulty, annos.group_ids
+            bboxes_3d, labels, annos.bbox, annos.difficulty, annos.group_ids, annos.names
         )
 
 

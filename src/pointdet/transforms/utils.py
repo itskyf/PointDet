@@ -51,9 +51,9 @@ def box_collision_test(
                                 if abc != abd:
                                     ret[i, j] = True  # collision.
                                     break
-                        if ret[i, j] is True:
+                        if ret[i, j]:
                             break
-                    if ret[i, j] is False:
+                    if not ret[i, j]:
                         # now check complete overlap.
                         # box overlap qbox:
                         box_overlap_qbox = True
@@ -70,7 +70,7 @@ def box_collision_test(
                             if box_overlap_qbox is False:
                                 break
 
-                        if box_overlap_qbox is False:
+                        if not box_overlap_qbox:
                             qbox_overlap_box = True
                             for box_l in range(4):  # point box_l in boxes
                                 for k in range(4):  # corner k in qboxes
@@ -82,7 +82,7 @@ def box_collision_test(
                                     if cross >= 0:  #
                                         qbox_overlap_box = False
                                         break
-                                if qbox_overlap_box is False:
+                                if not qbox_overlap_box:
                                     break
                             if qbox_overlap_box:
                                 ret[i, j] = True  # collision.

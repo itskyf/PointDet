@@ -1,3 +1,4 @@
+import enum
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -20,14 +21,25 @@ class BoxAnnotation:
     # TODO plane_lidar
 
 
+class FlipDirection(enum.Enum):
+    DIAGONAL = enum.auto()
+    HORIZONTAL = enum.auto()
+    VERTICAL = enum.auto()
+
+
 @dataclass
 class PointCloud:
     sample_idx: int
     lidar2img: NDArray[np.float32]
     points: NDArray[np.float32]
     annos: Optional[BoxAnnotation]
+
     bboxes_3d: LiDARBoxes3D = field(init=False)
     labels_3d: NDArray[np.int32] = field(init=False)
+
+    flip_direction: Optional[FlipDirection] = field(init=False)
+    pcd_h_flip: bool = field(init=False)
+    pcd_v_flip: bool = field(init=False)
 
     def __post_init__(self):
         if self.annos is not None:

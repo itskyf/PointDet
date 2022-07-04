@@ -128,6 +128,6 @@ def remove_outside_points(
     frustum = get_frustum(image_bbox, C) - T
     frustum = np.linalg.inv(R) @ frustum.T
     frustum = camera_to_lidar(frustum.T, rect, trv2c)
-    frustum_surfaces = corner_to_surfaces_3d_jit(frustum[np.newaxis, ...])
+    frustum_surfaces = box_np_ops.corner_to_surfaces_3d_jit(frustum[np.newaxis, ...])
     indices = box_np_ops.points_in_convex_polygon_3d_jit(points[:, :3], frustum_surfaces)
     return points[indices.reshape(-1)]

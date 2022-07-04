@@ -85,3 +85,5 @@ class LiDARBoxes3D(IBoxes3D):
             self.tensor[:, 0::7] = -self.tensor[:, 0::7]
             if self.with_yaw:
                 self.tensor[:, 6] = -self.tensor[:, 6] + np.pi
+        else:
+            raise ValueError

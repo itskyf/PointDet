@@ -1,3 +1,6 @@
+import numpy as np
+
+from ....typing import FlipDirection
 from .interface import IBoxes3D
 
 
@@ -24,3 +27,27 @@ class CameraBoxes3D(IBoxes3D):
         with_yaw (bool): If True, the value of yaw will be set to 0 as
             axis-aligned boxes tightly enclosing the original boxes.
     """
+
+    def flip(self, bev_direction: FlipDirection):
+        """Flip the boxes in BEV along given BEV direction.
+
+        In CAM coordinates, it flips the x (horizontal) or z (vertical) axis.
+
+        Args:
+            bev_direction (str): Flip direction (horizontal or vertical).
+            points (torch.Tensor | np.ndarray | :obj:`BasePoints`, optional):
+                Points to flip. Defaults to None.
+
+        Returns:
+            torch.Tensor, numpy.ndarray or None: Flipped points.
+        """
+        if bev_direction is FlipDirection.HORIZONTAL:
+            self.tensor[:, 0::7] = -self.tensor[:, 0::7]
+            if self.with_yaw:
+                self.tensor[:, 6] = -self.tensor[:, 6] + np.pi
+        elif bev_direction is FlipDirection.VERTICAL:
+            self.tensor[:, 2::7] = -self.tensor[:, 2::7]
+            if self.with_yaw:
+                self.tensor[:, 6] = -self.tensor[:, 6]
+        else:
+            raise ValueError

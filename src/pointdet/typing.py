@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 import enum
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import torch
 from numpy.typing import NDArray
 
-from .core.bbox.structures import LiDARBoxes3D
+if TYPE_CHECKING:
+    from .core.bbox.structures import LiDARBoxes3D
 
 
 @dataclass

@@ -109,3 +109,22 @@ class IBoxes3D(ABC):
                 Can be chosen from 'horizontal' and 'vertical'.
                 Defaults to 'horizontal'.
         """
+
+    def scale(self, scale_factor: float):
+        """Scale the box with horizontal and vertical scaling factors.
+
+        Args:
+            scale_factors (float): Scale factors to scale the boxes.
+        """
+        self.tensor[:, :6] *= scale_factor
+        self.tensor[:, 7:] *= scale_factor  # velocity
+
+    def translate(self, trans_vector):
+        """Translate boxes with the given translation vector.
+
+        Args:
+            trans_vector (torch.Tensor): Translation vector of size (1, 3).
+        """
+        if not isinstance(trans_vector, torch.Tensor):
+            trans_vector = self.tensor.new_tensor(trans_vector)
+        self.tensor[:, :3] += trans_vector

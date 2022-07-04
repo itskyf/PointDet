@@ -2,7 +2,6 @@
 from typing import Union
 
 import numpy as np
-from numpy.typing import NDArray
 
 from ..typing import FlipDirection, PointCloud
 
@@ -99,7 +98,9 @@ class RandomFlip:
             dict: Flipped results, 'flip', 'flip_direction' keys are added \
                 into result dict.
         """
-        if not hasattr(pcd.aug, "flip_dir"):
+        try:
+            pcd.aug_info.flip_dir
+        except AttributeError:
             # Randomly select a direction
             if isinstance(self.flip_ratio, list):
                 non_flip_ratio = 1 - sum(self.flip_ratio)
@@ -109,7 +110,7 @@ class RandomFlip:
                 # exclude non-flip
                 single_ratio = self.flip_ratio / self.num_direction
                 flip_ratios = [single_ratio] * self.num_direction + [non_flip_ratio]
-            pcd.aug.flip_dir = self.rng.choice(self.directions, p=flip_ratios)
+            pcd.aug_info.flip_dir = self.rng.choice(self.directions, p=flip_ratios)
         # TODO flip image
         return pcd
 
@@ -180,18 +181,22 @@ class RandomFlip3D(RandomFlip):
         # flip 2D image and its annotations
         super().__call__(pcd)
         if self.sync_2d:
-            pcd.aug.pcd_h_flip = pcd.aug.flip_dir is not None
-            pcd.aug.pcd_v_flip = False
+            pcd.aug_info.h_flip = pcd.aug_info.flip_dir is not None
+            pcd.aug_info.v_flip = False
         else:
             rand_ratio = self.rng.random()
-            if not hasattr(pcd.aug, "pcd_h_flip"):
+            try:
+                pcd.aug_info.h_flip
+            except AttributeError:
                 assert isinstance(self.flip_ratio, float)
-                pcd.aug.pcd_h_flip = rand_ratio < self.flip_ratio
-            if not hasattr(pcd.aug, "pcd_v_flip"):
-                pcd.aug.pcd_v_flip = rand_ratio < self.v_bev_flip_ratio
+                pcd.aug_info.h_flip = rand_ratio < self.flip_ratio
+            try:
+                pcd.aug_info.v_flip
+            except AttributeError:
+                pcd.aug_info.v_flip = rand_ratio < self.v_bev_flip_ratio
 
-        if pcd.aug.pcd_h_flip:
-            self._random_flip_data_3d(pcd.points, FlipDirection.HORIZONTAL)
-        if pcd.aug.pcd_v_flip:
-            self._random_flip_data_3d(pcd.points, FlipDirection.VERTICAL)
+        if pcd.aug_info.h_flip:
+            self._random_flip_data_3d(pcd, FlipDirection.HORIZONTAL)
+        if pcd.aug_info.v_flip:
+            self._random_flip_data_3d(pcd, FlipDirection.VERTICAL)
         return pcd

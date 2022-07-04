@@ -28,13 +28,16 @@ class FlipDirection(enum.Enum):
 
 
 @dataclass
-class Augmentation:
+class PCDAugmentation:
     # Flipping
     flip_dir: Optional[FlipDirection] = field(init=False)
-    pcd_h_flip: bool = field(init=False)
-    pcd_v_flip: bool = field(init=False)
+    h_flip: bool = field(init=False)
+    v_flip: bool = field(init=False)
     # Affine transform
-    pcd_scale_factor: float = field(init=False)
+    scale_factor: float = field(init=False)
+    rotation: NDArray[np.float32] = field(init=False)
+    rotation_angle: float = field(init=False)
+    trans_factor: NDArray[np.float32] = field(init=False)
 
 
 @dataclass
@@ -47,7 +50,7 @@ class PointCloud:
     gt_bboxes_3d: LiDARBoxes3D = field(init=False)
     gt_labels_3d: NDArray[np.int32] = field(init=False)
 
-    aug: Augmentation = field(default_factory=Augmentation)
+    aug_info: PCDAugmentation = field(default_factory=PCDAugmentation)
 
     def __post_init__(self):
         if self.annos is not None:

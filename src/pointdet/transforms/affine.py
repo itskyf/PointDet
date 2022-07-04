@@ -40,7 +40,7 @@ class GlobalRotScaleTrans:
         self.rng = rng
         self.rot_range = rot_range
         self.scale_ratio_range = scale_ratio_range
-        self.translation_std = translation_std
+        self.translation_std = np.array(translation_std, dtype=np.float32)
 
     def __call__(self, pcd: PointCloud) -> PointCloud:
         """Private function to rotate, scale and translate bounding boxes and
@@ -101,8 +101,7 @@ class GlobalRotScaleTrans:
                 and keys in input_dict['bbox3d_fields'] are updated
                 in the result dict.
         """
-        translation_std = np.array(self.translation_std, dtype=np.float32)
-        trans_vec = self.rng.normal(scale=translation_std, size=3).astype(np.float32).T
-        pcd.aug_info.trans_factor = trans_vec
+        trans_vec = self.rng.normal(scale=self.translation_std, size=3).astype(np.float32).T
         pcd.points[:, :3] += trans_vec
         pcd.gt_bboxes_3d.translate(trans_vec)
+        pcd.aug_info.trans_factor = trans_vec

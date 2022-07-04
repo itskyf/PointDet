@@ -7,7 +7,6 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ..core.bbox import box_np_ops
-from ..core.bbox.structures import LiDARBoxes3D
 from ..typing import DBInfo, PointCloud
 from .utils import box_collision_test
 
@@ -310,9 +309,10 @@ class GTSampler:
         sampled: Optional[DBSamples] = self.db_sampler(gt_bboxes_3d, gt_labels_3d)
         if sampled is not None:
             # Add sampled boxes to scene
-            pcd.gt_bboxes_3d = LiDARBoxes3D(np.concatenate([gt_bboxes_3d, sampled.bboxes_3d]))
+            pcd.gt_bboxes_3d = pcd.gt_bboxes_3d.new_box(
+                np.concatenate([gt_bboxes_3d, sampled.bboxes_3d])
+            )
             pcd.gt_labels_3d = np.concatenate([gt_labels_3d, sampled.labels_3d])
             points = self._remove_points_in_boxes(pcd.points, sampled.bboxes_3d)
             pcd.points = np.concatenate([sampled.points, points])
-
         return pcd

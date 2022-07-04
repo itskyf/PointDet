@@ -6,6 +6,7 @@ import torch
 from numpy.typing import NDArray
 
 from ....typing import FlipDirection
+from .utils import limit_period
 
 
 class IBoxes3D(ABC):
@@ -64,6 +65,12 @@ class IBoxes3D(ABC):
             self.tensor[:, :3] += self.tensor[:, 3:6] * (dst - src)
 
     @property
+    def bev(self):
+        """torch.Tensor: 2D BEV box of each box with rotation
+        in XYWHR format, in shape (N, 5)."""
+        return self.tensor[:, [0, 1, 3, 4, 6]]
+
+    @property
     def volume(self):
         """torch.Tensor: A vector with volume of each box."""
         return self.tensor[:, 3] * self.tensor[:, 4] * self.tensor[:, 5]
@@ -110,6 +117,57 @@ class IBoxes3D(ABC):
                 Defaults to 'horizontal'.
         """
 
+    def in_range_bev(self, box_range):
+        """Check whether the boxes are in the given range.
+
+        Args:
+            box_range (list | torch.Tensor): the range of box
+                (x_min, y_min, x_max, y_max)
+
+        Note:
+            The original implementation of SECOND checks whether boxes in
+            a range by checking whether the points are in a convex
+            polygon, we reduce the burden for simpler cases.
+
+        Returns:
+            torch.Tensor: Whether each box is inside the reference range.
+        """
+        xmin_mask = self.bev[:, 0] > box_range[0]
+        ymin_mask = self.bev[:, 1] > box_range[1]
+        xmax_mask = self.bev[:, 0] < box_range[2]
+        ymax_mask = self.bev[:, 1] < box_range[3]
+        return xmin_mask & ymin_mask & xmax_mask & ymax_mask
+
+    def limit_yaw(self, offset=0.5, period=np.pi):
+        """Limit the yaw to a given period and offset.
+
+        Args:
+            offset (float, optional): The offset of the yaw. Defaults to 0.5.
+            period (float, optional): The expected period. Defaults to np.pi.
+        """
+        self.tensor[:, 6] = limit_period(self.tensor[:, 6], offset, period)
+
+    def new_box(self, data: Union[list, torch.Tensor, np.ndarray]):
+        """Create a new box object with data.
+
+        The new box and its tensor has the similar properties
+            as self and self.tensor, respectively.
+
+        Args:
+            data (torch.Tensor | numpy.array | list): Data to be copied.
+
+        Returns:
+            :obj:`BaseInstance3DBoxes`: A new bbox object with ``data``,
+                the object's other properties are similar to ``self``.
+        """
+        new_tensor = (
+            self.tensor.new_tensor(data)
+            if not isinstance(data, torch.Tensor)
+            else data.to(self.tensor.device)
+        )
+        original_type = type(self)
+        return original_type(new_tensor, box_dim=self.box_dim, with_yaw=self.with_yaw)
+
     def scale(self, scale_factor: float):
         """Scale the box with horizontal and vertical scaling factors.
 
@@ -117,9 +175,9 @@ class IBoxes3D(ABC):
             scale_factors (float): Scale factors to scale the boxes.
         """
         self.tensor[:, :6] *= scale_factor
-        self.tensor[:, 7:] *= scale_factor  # velocity
+        self.tensor[:, 7:] *= scale_factor  # skip velocity
 
-    def translate(self, trans_vector):
+    def translate(self, trans_vector: Union[list, torch.Tensor, np.ndarray]):
         """Translate boxes with the given translation vector.
 
         Args:

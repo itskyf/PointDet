@@ -1,12 +1,14 @@
-import abc
+from abc import ABC, abstractmethod
 from typing import Optional, Union
 
 import numpy as np
 import torch
 from numpy.typing import NDArray
 
+from ....typing import FlipDirection
 
-class IBoxes3D(abc.ABC):
+
+class IBoxes3D(ABC):
     """Base class for 3D Boxes.
 
     Note:
@@ -97,3 +99,13 @@ class IBoxes3D(abc.ABC):
     def center(self):
         """torch.Tensor: A tensor with center of each box in shape (N, 3)."""
         return self.tensor[:, :3]
+
+    @abstractmethod
+    def flip(self, bev_direction: FlipDirection):
+        """Flip the boxes in BEV along given BEV direction.
+
+        Args:
+            bev_direction (str, optional): Direction by which to flip.
+                Can be chosen from 'horizontal' and 'vertical'.
+                Defaults to 'horizontal'.
+        """

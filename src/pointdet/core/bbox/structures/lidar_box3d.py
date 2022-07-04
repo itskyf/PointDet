@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from numpy.typing import NDArray
 
+from ....typing import FlipDirection
 from .interface import IBoxes3D
 from .utils import limit_period
 
@@ -62,3 +63,25 @@ class LiDARBoxes3D(IBoxes3D):
             else torch.cat([xyz[..., :3], xyz_size, arr[..., 6:]], dim=-1)
         )
         return cls(arr, box_dim=arr.size(-1), with_yaw=src.with_yaw)
+
+    def flip(self, bev_direction: FlipDirection):
+        """Flip the boxes in BEV along given BEV direction.
+
+        In LIDAR coordinates, it flips the y (horizontal) or x (vertical) axis.
+
+        Args:
+            bev_direction (str): Flip direction (horizontal or vertical).
+            points (torch.Tensor | np.ndarray | :obj:`BasePoints`, optional):
+                Points to flip. Defaults to None.
+
+        Returns:
+            torch.Tensor, numpy.ndarray or None: Flipped points.
+        """
+        if bev_direction is FlipDirection.HORIZONTAL:
+            self.tensor[:, 1::7] = -self.tensor[:, 1::7]
+            if self.with_yaw:
+                self.tensor[:, 6] = -self.tensor[:, 6]
+        elif bev_direction is FlipDirection.VERTICAL:
+            self.tensor[:, 0::7] = -self.tensor[:, 0::7]
+            if self.with_yaw:
+                self.tensor[:, 6] = -self.tensor[:, 6] + np.pi

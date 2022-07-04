@@ -301,8 +301,8 @@ class GTSampler:
                 'points', 'gt_bboxes_3d', 'gt_labels_3d' keys are updated
                 in the result dict.
         """
-        gt_bboxes_3d = pt_cloud.bboxes_3d.tensor.numpy()
-        gt_labels_3d = pt_cloud.labels_3d
+        gt_bboxes_3d = pt_cloud.gt_bboxes_3d.tensor.numpy()
+        gt_labels_3d = pt_cloud.gt_labels_3d
 
         # TODO use ground_plane
         # change to float for blending operation
@@ -310,8 +310,8 @@ class GTSampler:
         sampled: Optional[DBSamples] = self.db_sampler(gt_bboxes_3d, gt_labels_3d)
         if sampled is not None:
             # Add sampled boxes to scene
-            pt_cloud.bboxes_3d = LiDARBoxes3D(np.concatenate([gt_bboxes_3d, sampled.bboxes_3d]))
-            pt_cloud.labels_3d = np.concatenate([gt_labels_3d, sampled.labels_3d])
+            pt_cloud.gt_bboxes_3d = LiDARBoxes3D(np.concatenate([gt_bboxes_3d, sampled.bboxes_3d]))
+            pt_cloud.gt_labels_3d = np.concatenate([gt_labels_3d, sampled.labels_3d])
             points = self._remove_points_in_boxes(pt_cloud.points, sampled.bboxes_3d)
             pt_cloud.points = np.concatenate([sampled.points, points])
 

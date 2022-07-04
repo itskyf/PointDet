@@ -76,7 +76,7 @@ def create_groundtruth_database(
         group_ids = pt_cloud.annos.group_ids
         names = pt_cloud.annos.names
 
-        bboxes_3d = pt_cloud.bboxes_3d.tensor.numpy()
+        bboxes_3d = pt_cloud.gt_bboxes_3d.tensor.numpy()
         points = pt_cloud.points
         point_indices = box_np_ops.points_in_rbbox(points, bboxes_3d)
 

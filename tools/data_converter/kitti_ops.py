@@ -1,31 +1,8 @@
-import numba
 import numpy as np
 from numpy.typing import NDArray
 
 from pointdet.core.bbox import box_np_ops
 from pointdet.core.bbox.structures.utils import limit_period
-
-
-@numba.njit
-def corner_to_surfaces_3d_jit(corners):
-    """Convert 3d box corners from corner function above to surfaces that
-    normal vectors all direct to internal.
-    Args:
-        corners (np.ndarray): 3d box corners with the shape of (N, 8, 3).
-    Returns:
-        np.ndarray: Surfaces with the shape of (N, 6, 4, 3).
-    """
-    # box_corners: [N, 8, 3], must from corner functions in this module
-    num_boxes = corners.shape[0]
-    surfaces = np.zeros((num_boxes, 6, 4, 3), dtype=corners.dtype)
-    corner_idxes = np.array(
-        [[0, 1, 2, 3], [7, 6, 5, 4], [0, 3, 7, 4], [1, 5, 6, 2], [0, 4, 5, 1], [3, 2, 6, 7]]
-    )
-    for i in range(num_boxes):
-        for j in range(6):
-            for k in range(4):
-                surfaces[i, j, k] = corners[i, corner_idxes[j, k]]
-    return surfaces
 
 
 def box_camera_to_lidar(data, r_rect, velo2cam):

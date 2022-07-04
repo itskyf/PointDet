@@ -7,6 +7,34 @@ from numpy.typing import NDArray
 from .structures.utils import rotation_3d_in_axis
 
 
+@numba.njit
+def box2d_to_corner_jit(boxes: NDArray[np.float32]):
+    """Convert box2d to corner.
+    Args:
+        boxes (np.ndarray, shape=[N, 5]): Boxes2d with rotation.
+    Returns:
+        box_corners (np.ndarray, shape=[N, 4, 2]): Box corners.
+    """
+    num_box = boxes.shape[0]
+    corners_norm = np.zeros((4, 2), dtype=boxes.dtype)
+    corners_norm[1, 1] = 1.0
+    corners_norm[2] = 1.0
+    corners_norm[3, 0] = 1.0
+    corners_norm -= np.array([0.5, 0.5], dtype=boxes.dtype)
+    corners = boxes.reshape(num_box, 1, 5)[:, :, 2:4] * corners_norm.reshape(1, 4, 2)
+    rot_mat_t = np.zeros((2, 2), dtype=boxes.dtype)
+    box_corners = np.zeros((num_box, 4, 2), dtype=boxes.dtype)
+    for i in range(num_box):
+        rot_sin = np.sin(boxes[i, -1])
+        rot_cos = np.cos(boxes[i, -1])
+        rot_mat_t[0, 0] = rot_cos
+        rot_mat_t[0, 1] = rot_sin
+        rot_mat_t[1, 0] = -rot_sin
+        rot_mat_t[1, 1] = rot_cos
+        box_corners[i] = corners[i] @ rot_mat_t + boxes[i, :2]
+    return box_corners
+
+
 def center_to_corner_box2d(
     centers: NDArray[np.float32],
     dims: NDArray[np.float32],
@@ -118,6 +146,28 @@ def corner_to_standup_nd_jit(boxes_corner: NDArray[np.float32]) -> NDArray[np.fl
         for j in range(ndim):
             result[i, j + ndim] = np.max(boxes_corner[i, :, j])
     return result
+
+
+@numba.njit
+def corner_to_surfaces_3d_jit(corners):
+    """Convert 3d box corners from corner function above to surfaces that
+    normal vectors all direct to internal.
+    Args:
+        corners (np.ndarray): 3d box corners with the shape of (N, 8, 3).
+    Returns:
+        np.ndarray: Surfaces with the shape of (N, 6, 4, 3).
+    """
+    # box_corners: [N, 8, 3], must from corner functions in this module
+    num_boxes = corners.shape[0]
+    surfaces = np.zeros((num_boxes, 6, 4, 3), dtype=corners.dtype)
+    corner_idxes = np.array(
+        [[0, 1, 2, 3], [7, 6, 5, 4], [0, 3, 7, 4], [1, 5, 6, 2], [0, 4, 5, 1], [3, 2, 6, 7]]
+    )
+    for i in range(num_boxes):
+        for j in range(6):
+            for k in range(4):
+                surfaces[i, j, k] = corners[i, corner_idxes[j, k]]
+    return surfaces
 
 
 def corner_to_surfaces_3d(corners):

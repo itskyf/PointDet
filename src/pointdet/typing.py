@@ -34,8 +34,8 @@ class PointCloud:
     points: NDArray[np.float32]
     annos: Optional[BoxAnnotation]
 
-    bboxes_3d: LiDARBoxes3D = field(init=False)
-    labels_3d: NDArray[np.int32] = field(init=False)
+    gt_bboxes_3d: LiDARBoxes3D = field(init=False)
+    gt_labels_3d: NDArray[np.int32] = field(init=False)
 
     flip_direction: Optional[FlipDirection] = field(init=False)
     pcd_h_flip: bool = field(init=False)
@@ -43,8 +43,8 @@ class PointCloud:
 
     def __post_init__(self):
         if self.annos is not None:
-            self.bboxes_3d = self.annos.bboxes_3d
-            self.labels_3d = self.annos.labels
+            self.gt_bboxes_3d = self.annos.bboxes_3d
+            self.gt_labels_3d = self.annos.labels
 
 
 @dataclass

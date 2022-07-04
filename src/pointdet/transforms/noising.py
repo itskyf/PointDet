@@ -51,10 +51,9 @@ class ObjectNoise:
             dict: Results after adding noise to each object,
                 'points', 'gt_bboxes_3d' keys are updated in the result dict.
         """
-        # TODO: this is inplace operation
+        # TODO: remove inplace operation
         np_bbox3d = pt_cloud.gt_bboxes_3d.tensor.numpy()
         np_points = pt_cloud.points
-
         _noise_per_object_v3_(
             self.rng,
             np_bbox3d,

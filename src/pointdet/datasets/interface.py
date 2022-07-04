@@ -6,6 +6,7 @@ from typing import Callable, Optional
 import numpy as np
 from torch.utils.data import Dataset
 
+from ..transforms import Compose
 from ..typing import PointCloud
 
 
@@ -21,7 +22,7 @@ class IDataset(Dataset):
             self.infos = pickle.load(info_file)
         self.rng = rng
         self.training = training
-        self.transforms = transforms
+        self.transforms = transforms if transforms is not None else Compose([])
 
     def __getitem__(self, index: int) -> PointCloud:
         info = self.infos[index]
@@ -29,9 +30,7 @@ class IDataset(Dataset):
         if sample.annos is not None and not np.any(sample.annos.labels != -1):
             # No interesting labels
             return self[self.rng.integers(len(self))]
-        if self.transforms is not None:
-            sample = self.transforms(sample)
-        return sample
+        return self.transforms(sample)
 
     def __len__(self):
         return len(self.infos)

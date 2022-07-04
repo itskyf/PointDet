@@ -54,10 +54,10 @@ class RandomFlip:
         else:
             raise TypeError("flip_ratios must be float or list of float")
 
-        self.direction_list = (
+        self.directions = (
             [*direction, None] if isinstance(direction, list) else [direction, None]
         )
-        self.num_direction = len(self.direction_list) - 1
+        self.num_direction = len(self.directions) - 1
         self.flip_ratio = flip_ratio
         self.rng = rng
 
@@ -92,7 +92,7 @@ class RandomFlip:
             raise NotImplementedError(f"Invalid flipping direction '{direction}'")
         return flipped
 
-    def __call__(self, pt_cloud: PointCloud) -> PointCloud:
+    def __call__(self, pt_cld: PointCloud) -> PointCloud:
         """Call function to flip bounding boxes, masks, semantic segmentation
         maps.
         Args:
@@ -101,19 +101,19 @@ class RandomFlip:
             dict: Flipped results, 'flip', 'flip_direction' keys are added \
                 into result dict.
         """
-        if not hasattr(pt_cloud, "flip_direction"):
+        if not hasattr(pt_cld.aug, "flip_dir"):
             # Randomly select a direction
             if isinstance(self.flip_ratio, list):
                 non_flip_ratio = 1 - sum(self.flip_ratio)
-                flip_ratio_list = self.flip_ratio + [non_flip_ratio]
+                flip_ratios = self.flip_ratio + [non_flip_ratio]
             else:
                 non_flip_ratio = 1 - self.flip_ratio
                 # exclude non-flip
                 single_ratio = self.flip_ratio / self.num_direction
-                flip_ratio_list = [single_ratio] * self.num_direction + [non_flip_ratio]
-            pt_cloud.flip_direction = self.rng.choice(self.direction_list, p=flip_ratio_list)
+                flip_ratios = [single_ratio] * self.num_direction + [non_flip_ratio]
+            pt_cld.aug.flip_dir = self.rng.choice(self.directions, p=flip_ratios)
         # TODO flip image
-        return pt_cloud
+        return pt_cld
 
 
 class RandomFlip3D(RandomFlip):
@@ -166,7 +166,7 @@ class RandomFlip3D(RandomFlip):
         else:
             raise NotImplementedError
 
-    def __call__(self, pt_cloud: PointCloud) -> PointCloud:
+    def __call__(self, pt_cld: PointCloud) -> PointCloud:
         """Call function to flip points, values in the ``bbox3d_fields`` and
         also flip 2D image and its annotations.
 
@@ -179,20 +179,20 @@ class RandomFlip3D(RandomFlip):
                 into result dict.
         """
         # flip 2D image and its annotations
-        super().__call__(pt_cloud)
+        super().__call__(pt_cld)
         if self.sync_2d:
-            pt_cloud.pcd_h_flip = pt_cloud.flip_direction is not None
-            pt_cloud.pcd_v_flip = False
+            pt_cld.aug.pcd_h_flip = pt_cld.aug.flip_dir is not None
+            pt_cld.aug.pcd_v_flip = False
         else:
             rand_ratio = self.rng.random()
-            if not hasattr(pt_cloud, "pcd_h_flip"):
+            if not hasattr(pt_cld.aug, "pcd_h_flip"):
                 assert isinstance(self.flip_ratio, float)
-                pt_cloud.pcd_h_flip = rand_ratio < self.flip_ratio
-            if not hasattr(pt_cloud, "pcd_v_flip"):
-                pt_cloud.pcd_v_flip = rand_ratio < self.v_bev_flip_ratio
+                pt_cld.aug.pcd_h_flip = rand_ratio < self.flip_ratio
+            if not hasattr(pt_cld.aug, "pcd_v_flip"):
+                pt_cld.aug.pcd_v_flip = rand_ratio < self.v_bev_flip_ratio
 
-        if pt_cloud.pcd_h_flip:
-            self._random_flip_points(pt_cloud.points, FlipDirection.HORIZONTAL)
-        if pt_cloud.pcd_v_flip:
-            self._random_flip_points(pt_cloud.points, FlipDirection.VERTICAL)
-        return pt_cloud
+        if pt_cld.aug.pcd_h_flip:
+            self._random_flip_points(pt_cld.points, FlipDirection.HORIZONTAL)
+        if pt_cld.aug.pcd_v_flip:
+            self._random_flip_points(pt_cld.points, FlipDirection.VERTICAL)
+        return pt_cld

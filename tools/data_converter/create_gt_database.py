@@ -68,20 +68,20 @@ def create_groundtruth_database(
 
     group_counter = 0
     db_infos: defaultdict[str, list[DBInfo]] = defaultdict(list)
-    for pt_cloud in tqdm(dataset, desc="GT database"):
-        pt_cloud: PointCloud
-        assert pt_cloud.annos is not None
+    for pcd in tqdm(dataset, desc="GT database"):
+        pcd: PointCloud
+        assert pcd.annos is not None
 
-        difficulty = pt_cloud.annos.difficulty
-        group_ids = pt_cloud.annos.group_ids
-        names = pt_cloud.annos.names
+        difficulty = pcd.annos.difficulty
+        group_ids = pcd.annos.group_ids
+        names = pcd.annos.names
 
-        bboxes_3d = pt_cloud.gt_bboxes_3d.tensor.numpy()
-        points = pt_cloud.points
+        bboxes_3d = pcd.gt_bboxes_3d.tensor.numpy()
+        points = pcd.points
         point_indices = box_np_ops.points_in_rbbox(points, bboxes_3d)
 
         group_dict = {}
-        img_idx = pt_cloud.sample_idx
+        img_idx = pcd.sample_idx
         for gt_idx, (bbox_3d, diff, name, local_gid) in enumerate(
             zip(bboxes_3d, difficulty, names, group_ids)
         ):

@@ -43,7 +43,7 @@ class ObjectNoise:
         self.num_try = num_try
         self.rng = rng
 
-    def __call__(self, pt_cloud: PointCloud) -> PointCloud:
+    def __call__(self, pcd: PointCloud) -> PointCloud:
         """Call function to apply noise to each ground truth in the scene.
         Args:
             input_dict (dict): Result dict from loading pipeline.
@@ -52,8 +52,8 @@ class ObjectNoise:
                 'points', 'gt_bboxes_3d' keys are updated in the result dict.
         """
         # TODO: remove inplace operation
-        np_bbox3d = pt_cloud.gt_bboxes_3d.tensor.numpy()
-        np_points = pt_cloud.points
+        np_bbox3d = pcd.gt_bboxes_3d.tensor.numpy()
+        np_points = pcd.points
         _noise_per_object_v3_(
             self.rng,
             np_bbox3d,
@@ -64,9 +64,9 @@ class ObjectNoise:
             num_try=self.num_try,
         )
 
-        pt_cloud.gt_bboxes_3d = np_bbox3d
-        pt_cloud.points = np_points
-        return pt_cloud
+        pcd.gt_bboxes_3d = np_bbox3d
+        pcd.points = np_points
+        return pcd
 
 
 @numba.njit

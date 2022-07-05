@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Union
+from typing import Union
 
 import numpy as np
 import torch
-from numpy.typing import NDArray
 
 from ....typing import FlipDirection
 from .utils import limit_period
+
+_DEFAULT_ORIGIN = (0.5, 0.5, 0)
 
 
 class IBoxes3D(ABC):
@@ -17,7 +18,7 @@ class IBoxes3D(ABC):
         the box is (0.5, 0.5, 0).
 
     Args:
-        tensor (torch.Tensor | np.ndarray | list): a N x box_dim matrix.
+        tensor (torch.Tensor | np.ndarray): a N x box_dim matrix.
         box_dim (int): Number of the dimension of a box.
             Each row is (x, y, z, x_size, y_size, z_size, yaw).
             Defaults to 7.
@@ -38,10 +39,10 @@ class IBoxes3D(ABC):
 
     def __init__(
         self,
-        tensor: Union[torch.Tensor, NDArray[np.float32]],
+        tensor: Union[np.ndarray, torch.Tensor],
         box_dim: int = 7,
         with_yaw: bool = True,
-        origin: Optional[tuple[float, float, float]] = None,
+        origin: tuple[float, float, float] = _DEFAULT_ORIGIN,
     ):
         device = tensor.device if isinstance(tensor, torch.Tensor) else torch.device("cpu")
         tensor = torch.as_tensor(tensor, dtype=torch.float32, device=device)
@@ -53,59 +54,21 @@ class IBoxes3D(ABC):
             # If the dimension of boxes is 6, we expand box_dim by padding
             # 0 as a fake yaw and set with_yaw to False.
             assert box_dim == 6
-            fake_rot = tensor.new_zeros(tensor.shape[0], 1)
+            fake_rot = tensor.new_zeros(tensor.size(0), 1)
             tensor = torch.cat((tensor, fake_rot), dim=-1)
             self.box_dim = box_dim + 1
             self.with_yaw = False
-        self.tensor = tensor
+        self.tensor = tensor.clone()
 
-        if origin is not None and origin != (0.5, 0.5, 0):
-            dst = self.tensor.new_tensor((0.5, 0.5, 0))
+        if origin != _DEFAULT_ORIGIN:
+            dst = self.tensor.new_tensor(_DEFAULT_ORIGIN)
             src = self.tensor.new_tensor(origin)
             self.tensor[:, :3] += self.tensor[:, 3:6] * (dst - src)
 
     @property
     def bev(self):
-        """torch.Tensor: 2D BEV box of each box with rotation
-        in XYWHR format, in shape (N, 5)."""
+        """torch.Tensor: 2D BEV box of each box with rotation in XYWHR format, in shape (N, 5)."""
         return self.tensor[:, [0, 1, 3, 4, 6]]
-
-    @property
-    def volume(self):
-        """torch.Tensor: A vector with volume of each box."""
-        return self.tensor[:, 3] * self.tensor[:, 4] * self.tensor[:, 5]
-
-    @property
-    def dims(self):
-        """torch.Tensor: Size dimensions of each box in shape (N, 3)."""
-        return self.tensor[:, 3:6]
-
-    @property
-    def yaw(self):
-        """torch.Tensor: A vector with yaw of each box in shape (N, )."""
-        return self.tensor[:, 6]
-
-    @property
-    def height(self):
-        """torch.Tensor: A vector with height of each box in shape (N, )."""
-        return self.tensor[:, 5]
-
-    @property
-    def top_height(self):
-        """torch.Tensor:
-        A vector with the top height of each box in shape (N, )."""
-        return self.bottom_height + self.height
-
-    @property
-    def bottom_height(self):
-        """torch.Tensor:
-        A vector with bottom's height of each box in shape (N, )."""
-        return self.tensor[:, 2]
-
-    @property
-    def center(self):
-        """torch.Tensor: A tensor with center of each box in shape (N, 3)."""
-        return self.tensor[:, :3]
 
     @abstractmethod
     def flip(self, bev_direction: FlipDirection):
@@ -117,28 +80,20 @@ class IBoxes3D(ABC):
                 Defaults to 'horizontal'.
         """
 
-    def in_range_bev(self, box_range):
-        """Check whether the boxes are in the given range.
+    @abstractmethod
+    def rotate(self, angle: Union[float, np.ndarray, torch.Tensor]):
+        """Rotate boxes with points (optional) with the given angle or rotation
+        matrix.
 
         Args:
-            box_range (list | torch.Tensor): the range of box
-                (x_min, y_min, x_max, y_max)
-
-        Note:
-            The original implementation of SECOND checks whether boxes in
-            a range by checking whether the points are in a convex
-            polygon, we reduce the burden for simpler cases.
-
-        Returns:
-            torch.Tensor: Whether each box is inside the reference range.
+            angle (float | torch.Tensor | np.ndarray):
+                Rotation angle or rotation matrix.
+            points (torch.Tensor | numpy.ndarray |
+                :obj:`BasePoints`, optional):
+                Points to rotate. Defaults to None.
         """
-        xmin_mask = self.bev[:, 0] > box_range[0]
-        ymin_mask = self.bev[:, 1] > box_range[1]
-        xmax_mask = self.bev[:, 0] < box_range[2]
-        ymax_mask = self.bev[:, 1] < box_range[3]
-        return xmin_mask & ymin_mask & xmax_mask & ymax_mask
 
-    def limit_yaw(self, offset=0.5, period=np.pi):
+    def limit_yaw(self, offset: float = 0.5, period: float = np.pi):
         """Limit the yaw to a given period and offset.
 
         Args:
@@ -147,27 +102,6 @@ class IBoxes3D(ABC):
         """
         self.tensor[:, 6] = limit_period(self.tensor[:, 6], offset, period)
 
-    def new_box(self, data: Union[list, torch.Tensor, np.ndarray]):
-        """Create a new box object with data.
-
-        The new box and its tensor has the similar properties
-            as self and self.tensor, respectively.
-
-        Args:
-            data (torch.Tensor | numpy.array | list): Data to be copied.
-
-        Returns:
-            :obj:`BaseInstance3DBoxes`: A new bbox object with ``data``,
-                the object's other properties are similar to ``self``.
-        """
-        new_tensor = (
-            self.tensor.new_tensor(data)
-            if not isinstance(data, torch.Tensor)
-            else data.to(self.tensor.device)
-        )
-        original_type = type(self)
-        return original_type(new_tensor, box_dim=self.box_dim, with_yaw=self.with_yaw)
-
     def scale(self, scale_factor: float):
         """Scale the box with horizontal and vertical scaling factors.
 
@@ -175,9 +109,9 @@ class IBoxes3D(ABC):
             scale_factors (float): Scale factors to scale the boxes.
         """
         self.tensor[:, :6] *= scale_factor
-        self.tensor[:, 7:] *= scale_factor  # skip velocity
+        self.tensor[:, 7:] *= scale_factor  # velocity
 
-    def translate(self, trans_vector: Union[list, torch.Tensor, np.ndarray]):
+    def translate(self, trans_vector):
         """Translate boxes with the given translation vector.
 
         Args:
@@ -186,3 +120,19 @@ class IBoxes3D(ABC):
         if not isinstance(trans_vector, torch.Tensor):
             trans_vector = self.tensor.new_tensor(trans_vector)
         self.tensor[:, :3] += trans_vector
+
+    def new_boxes(self, data: Union[np.ndarray, torch.Tensor]):
+        """Create a new box object with data.
+
+        The new box and its tensor has the similar properties
+            as self and self.tensor, respectively.
+
+        Args:
+            data (torch.Tensor | numpy.array): Data to be copied.
+
+        Returns:
+            :obj:`BaseInstance3DBoxes`: A new bbox object with ``data``,
+                the object's other properties are similar to ``self``.
+        """
+        new_tensor = self.tensor.new_tensor(data)
+        return type(self)(new_tensor, box_dim=self.box_dim, with_yaw=self.with_yaw)

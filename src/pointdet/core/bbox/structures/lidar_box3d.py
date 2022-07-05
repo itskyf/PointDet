@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import torch
-from numpy.typing import NDArray
 
 from ....typing import FlipDirection
 from .interface import IBoxes3D
-from .utils import limit_period
+from .utils import limit_period, rotation_3d_in_axis
 
 if TYPE_CHECKING:
     from .cam_box3d import CameraBoxes3D
@@ -45,11 +44,18 @@ class LiDARBoxes3D(IBoxes3D):
 
     @classmethod
     def from_camera_box3d(
-        cls, src: CameraBoxes3D, rect: NDArray[np.float32], trv2c: NDArray[np.float32]
+        cls,
+        src: CameraBoxes3D,
+        rect: Union[np.ndarray, torch.Tensor],
+        trv2c: Union[np.ndarray, torch.Tensor],
     ):
         arr = src.tensor
+        if not isinstance(rect, torch.Tensor):
+            rect = arr.new_tensor(rect)
+        if not isinstance(trv2c, torch.Tensor):
+            trv2c = arr.new_tensor(trv2c)
         xyz = arr[..., :3]
-        rt_mat = torch.linalg.inv(torch.from_numpy(rect @ trv2c))
+        rt_mat = torch.linalg.inv(rect @ trv2c)
         if rt_mat.size(1) == 4:  # extend xyz
             xyz = torch.cat([xyz, arr.new_ones(arr.size(0), 1)], dim=-1)
         xyz = xyz @ rt_mat.t()
@@ -87,3 +93,41 @@ class LiDARBoxes3D(IBoxes3D):
                 self.tensor[:, 6] = -self.tensor[:, 6] + np.pi
         else:
             raise ValueError
+
+    def rotate(self, angle: Union[float, np.ndarray, torch.Tensor]):
+        """Rotate boxes with points (optional) with the given angle or rotation
+        matrix.
+
+        Args:
+            angles (float | torch.Tensor | np.ndarray):
+                Rotation angle or rotation matrix.
+            points (torch.Tensor | np.ndarray | :obj:`BasePoints`, optional):
+                Points to rotate. Defaults to None.
+
+        Returns:
+            tuple or None: When ``points`` is None, the function returns
+                None, otherwise it returns the rotated points and the
+                rotation matrix ``rot_mat_T``.
+        """
+        if not isinstance(angle, torch.Tensor):
+            angle = self.tensor.new_tensor(angle)
+
+        assert (
+            angle.shape == (3, 3) or angle.numel() == 1
+        ), f"invalid rotation angle shape {angle.shape}"
+
+        if angle.numel() == 1:
+            self.tensor[:, 0:3] = rotation_3d_in_axis(
+                self.tensor[:, 0:3], angle, axis=2
+            )  # yaw axis
+        else:
+            rot_mat_t = angle
+            rot_sin = rot_mat_t[0, 1]
+            rot_cos = rot_mat_t[0, 0]
+            angle = np.arctan2(rot_sin, rot_cos)
+            self.tensor[:, 0:3] = self.tensor[:, 0:3] @ rot_mat_t
+        self.tensor[:, 6] += angle
+
+        if self.tensor.size(1) == 9:
+            # TODO support other dataset (tensor.shape[1] == 9)
+            raise NotImplementedError

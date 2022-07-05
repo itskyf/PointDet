@@ -26,17 +26,11 @@ class ObjectNoise:
     def __init__(
         self,
         rng: np.random.Generator,
-        translation_std: Optional[tuple[float, float, float]] = None,
-        global_rot_range: Optional[tuple[float, float]] = None,
-        rot_range: Optional[tuple[float, float]] = None,
+        translation_std: tuple[float, float, float] = (0.25, 0.25, 0.25),
+        global_rot_range: tuple[float, float] = (0.0, 0.0),
+        rot_range: tuple[float, float] = (-0.15707963267, 0.15707963267),
         num_try: int = 100,
     ):
-        if translation_std is None:
-            translation_std = (0.25, 0.25, 0.25)
-        if global_rot_range is None:
-            global_rot_range = (0.0, 0.0)
-        if rot_range is None:
-            rot_range = (-0.15707963267, 0.15707963267)
         self.translation_std = translation_std
         self.global_rot_range = global_rot_range
         self.rot_range = rot_range
@@ -52,9 +46,12 @@ class ObjectNoise:
                 'points', 'gt_bboxes_3d' keys are updated in the result dict.
         """
         # TODO: remove inplace operation
-        np_bbox3d = pcd.gt_bboxes_3d.tensor.numpy()
-        np_points = pcd.points
-        _noise_per_object_v3_(
+        gt_bboxes_3d = pcd.gt_bboxes_3d
+        points = pcd.points
+
+        np_bbox3d = gt_bboxes_3d.tensor.numpy()
+        np_points = points.tensor.numpy()
+        _noise_per_object_v3(
             self.rng,
             np_bbox3d,
             np_points,
@@ -64,13 +61,13 @@ class ObjectNoise:
             num_try=self.num_try,
         )
 
-        pcd.gt_bboxes_3d = np_bbox3d
-        pcd.points = np_points
+        pcd.gt_bboxes_3d = gt_bboxes_3d.new_boxes(np_bbox3d)
+        pcd.points = points.new_points(np_points)
         return pcd
 
 
 @numba.njit
-def _box3d_transform_(boxes, loc_transform, rot_transform, valid_mask):
+def _box3d_transform(boxes, loc_transform, rot_transform, valid_mask):
     """Transform 3D boxes.
     Args:
         boxes (np.ndarray): 3D boxes to be transformed.
@@ -102,7 +99,7 @@ def _noise_per_box(boxes, valid_mask, loc_noises, rot_noises):
     num_tests = loc_noises.shape[1]
     box_corners = box_np_ops.box2d_to_corner_jit(boxes)
     current_corners = np.zeros((4, 2), dtype=boxes.dtype)
-    rot_mat_T = np.zeros((2, 2), dtype=boxes.dtype)
+    rot_mat_t = np.zeros((2, 2), dtype=boxes.dtype)
     success_mask = -np.ones(num_boxes, dtype=np.int32)
     # print(valid_mask)
     for i in range(num_boxes):
@@ -110,7 +107,7 @@ def _noise_per_box(boxes, valid_mask, loc_noises, rot_noises):
             for j in range(num_tests):
                 current_corners[:] = box_corners[i]
                 current_corners -= boxes[i, :2]
-                _rotation_box2d_jit_(current_corners, rot_noises[i, j], rot_mat_T)
+                _rotation_box2d_jit(current_corners, rot_noises[i, j], rot_mat_t)
                 current_corners += boxes[i, :2] + loc_noises[i, j, :2]
                 coll_mat = box_collision_test(current_corners.reshape(1, 4, 2), box_corners)
                 coll_mat[0, i] = False
@@ -123,7 +120,7 @@ def _noise_per_box(boxes, valid_mask, loc_noises, rot_noises):
 
 
 @numba.njit
-def _noise_per_box_v2_(boxes, valid_mask, loc_noises, rot_noises, global_rot_noises):
+def _noise_per_box_v2(boxes, valid_mask, loc_noises, rot_noises, global_rot_noises):
     """Add noise to every box (only on the horizontal plane). Version 2 used
     when enable global rotations.
     Args:
@@ -141,7 +138,7 @@ def _noise_per_box_v2_(boxes, valid_mask, loc_noises, rot_noises, global_rot_noi
     box_corners = box_np_ops.box2d_to_corner_jit(boxes)
     current_corners = np.zeros((4, 2), dtype=boxes.dtype)
     current_box = np.zeros((1, 5), dtype=boxes.dtype)
-    rot_mat_T = np.zeros((2, 2), dtype=boxes.dtype)
+    rot_mat_t = np.zeros((2, 2), dtype=boxes.dtype)
     dst_pos = np.zeros((2,), dtype=boxes.dtype)
     success_mask = -np.ones(num_boxes, dtype=np.int32)
     corners_norm = np.zeros((4, 2), dtype=boxes.dtype)
@@ -164,15 +161,15 @@ def _noise_per_box_v2_(boxes, valid_mask, loc_noises, rot_noises, global_rot_noi
 
                 rot_sin = np.sin(current_box[0, -1])
                 rot_cos = np.cos(current_box[0, -1])
-                rot_mat_T[0, 0] = rot_cos
-                rot_mat_T[0, 1] = rot_sin
-                rot_mat_T[1, 0] = -rot_sin
-                rot_mat_T[1, 1] = rot_cos
+                rot_mat_t[0, 0] = rot_cos
+                rot_mat_t[0, 1] = rot_sin
+                rot_mat_t[1, 0] = -rot_sin
+                rot_mat_t[1, 1] = rot_cos
                 current_corners[:] = (
-                    current_box[0, 2:4] * corners_norm @ rot_mat_T + current_box[0, :2]
+                    current_box[0, 2:4] * corners_norm @ rot_mat_t + current_box[0, :2]
                 )
                 current_corners -= current_box[0, :2]
-                _rotation_box2d_jit_(current_corners, rot_noises[i, j], rot_mat_T)
+                _rotation_box2d_jit(current_corners, rot_noises[i, j], rot_mat_t)
                 current_corners += current_box[0, :2] + loc_noises[i, j, :2]
                 coll_mat = box_collision_test(current_corners.reshape(1, 4, 2), box_corners)
                 coll_mat[0, i] = False
@@ -185,7 +182,7 @@ def _noise_per_box_v2_(boxes, valid_mask, loc_noises, rot_noises, global_rot_noi
     return success_mask
 
 
-def _noise_per_object_v3_(
+def _noise_per_object_v3(
     rng: np.random.Generator,
     gt_boxes: NDArray[np.float32],
     points: NDArray[np.float32],
@@ -231,7 +228,7 @@ def _noise_per_object_v3_(
     # TODO: rewrite this noise box function?
     in_gt_boxes = gt_boxes[:, [0, 1, 3, 4, 6]]
     selected_noise = (
-        _noise_per_box_v2_(in_gt_boxes, valid_mask, loc_noises, rot_noises, global_rot_noises)
+        _noise_per_box_v2(in_gt_boxes, valid_mask, loc_noises, rot_noises, global_rot_noises)
         if enable_grot
         else _noise_per_box(in_gt_boxes, valid_mask, loc_noises, rot_noises)
     )
@@ -242,15 +239,15 @@ def _noise_per_object_v3_(
     if points is not None:
         # TODO: replace this points_in_convex function by my tools?
         point_masks = box_np_ops.points_in_convex_polygon_3d_jit(points[:, :3], surfaces)
-        _points_transform_(
+        _points_transform(
             points, gt_boxes[:, :3], point_masks, loc_transforms, rot_transforms, valid_mask
         )
 
-    _box3d_transform_(gt_boxes, loc_transforms, rot_transforms, valid_mask)
+    _box3d_transform(gt_boxes, loc_transforms, rot_transforms, valid_mask)
 
 
 @numba.njit
-def _points_transform_(points, centers, point_masks, loc_transform, rot_transform, valid_mask):
+def _points_transform(points, centers, point_masks, loc_transform, rot_transform, valid_mask):
     """Apply transforms to points and box centers.
     Args:
         points (np.ndarray): Input points.
@@ -265,7 +262,7 @@ def _points_transform_(points, centers, point_masks, loc_transform, rot_transfor
     num_points = points.shape[0]
     rot_mat_T = np.zeros((num_box, 3, 3), dtype=points.dtype)
     for i in range(num_box):
-        _rotation_matrix_3d_(rot_mat_T[i], rot_transform[i], 2)
+        _rotation_matrix_3d(rot_mat_T[i], rot_transform[i], 2)
     for i in range(num_points):
         for j in range(num_box):
             if valid_mask[j]:
@@ -278,7 +275,7 @@ def _points_transform_(points, centers, point_masks, loc_transform, rot_transfor
 
 
 @numba.njit
-def _rotation_box2d_jit_(corners, angle, rot_mat_t):
+def _rotation_box2d_jit(corners, angle, rot_mat_t):
     """Rotate 2D boxes.
     Args:
         corners (np.ndarray): Corners of boxes.
@@ -295,7 +292,7 @@ def _rotation_box2d_jit_(corners, angle, rot_mat_t):
 
 
 @numba.njit
-def _rotation_matrix_3d_(rot_mat_T, angle, axis):
+def _rotation_matrix_3d(rot_mat_T, angle, axis):
     """Get the 3D rotation matrix.
     Args:
         rot_mat_T (np.ndarray): Transposed rotation matrix.

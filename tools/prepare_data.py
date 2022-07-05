@@ -21,12 +21,11 @@ def kitti_data_prep(root: Path, info_prefix: str, out_dir: Optional[Path] = None
     """
     if out_dir is None:  # TODO maybe move to parent scope
         out_dir = root
-    kitti_converter.gen_kitti_info(root, info_prefix, out_dir)
+    kitti_converter.gen_kitti_infos(root, info_prefix, out_dir)
 
     # TODO export 2D annotations
-    train_info_path = out_dir / f"{info_prefix}_infos_train.pkl"
     print("Create GT Database of KITTI dataset")
-    create_groundtruth_database(DatasetEnum.KITTI, root, info_prefix, train_info_path)
+    create_groundtruth_database(DatasetEnum.KITTI, root, info_prefix)
 
 
 def parse_arguments():

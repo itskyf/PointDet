@@ -1,17 +1,21 @@
-from .affine import GlobalRotScaleTrans
-from .compose import Compose
 from .gt_sampling import GTSampler
-from .noising import ObjectNoise
-from .points_transforms import ObjectRangeFilter, PointShuffle, PointsRangeFilter
-from .random_flip import RandomFlip3D
+from .object_noise import ObjectNoise
+from .transforms import (
+    Compose,
+    GlobalRotScaleTrans,
+    ObjectRangeFilter,
+    PointsRangeFilter,
+    PointsShuffle,
+    RandomFlip3D,
+)
 
 __all__ = [
-    "GlobalRotScaleTrans",
-    "Compose",
     "GTSampler",
     "ObjectNoise",
+    "Compose",
+    "GlobalRotScaleTrans",
     "ObjectRangeFilter",
-    "PointShuffle",
     "PointsRangeFilter",
+    "PointsShuffle",
     "RandomFlip3D",
 ]

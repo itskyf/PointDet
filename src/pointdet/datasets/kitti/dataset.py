@@ -3,9 +3,11 @@ from pathlib import Path
 from typing import Callable, Optional
 
 import numpy as np
+import torch
 from numpy.typing import NDArray
 
 from ...core.bbox.structures import CameraBoxes3D, LiDARBoxes3D
+from ...core.points import LiDARPoints
 from ...typing import BoxAnnotation, PointCloud
 from ..interface import IDataset
 from .typing import KittiAnnotation, KittiInfo
@@ -16,30 +18,40 @@ class KittiDataset(IDataset):
 
     def __init__(
         self,
-        root_split: Path,
-        info_path: Path,
+        root: Path,
+        info_name: str,
         pts_prefix: str,
+        *,
         rng: np.random.Generator,
         transforms: Optional[Callable[[PointCloud], PointCloud]] = None,
     ):
-        super().__init__(info_path, rng, transforms, training="train" in info_path.name)
-        self.root_split = root_split
+        info_path = root / info_name
+        info_name = info_path.name
+        if "train" in info_name or "val" in info_name:
+            split = "training"
+        elif "test" in info_name:
+            split = "testing"
+        else:
+            raise ValueError(f"Cannot detect split from info path {info_path}")
+        super().__init__(info_path, rng, transforms, training="train" in info_name)
+
+        self.path = root / split
         self.pts_prefix = pts_prefix
 
-    def _getitem_impl(self, info: KittiInfo) -> PointCloud:
+    def _get_sample(self, info: KittiInfo) -> PointCloud:
         calib = info.calib
         rect = calib.r0_rect
         trv2c = calib.trv2c
-
         lidar2img = calib.P2 @ rect @ trv2c
+
         annos = None
         if self.training:
-            assert info.annos is not None, "Training sample does not incluce annotation"
-            annos = self._get_annotation(info.annos, rect, trv2c) if self.training else None
+            assert info.annos is not None
+            annos = self._get_annotation(info.annos, rect, trv2c)
 
-        v_path = self.root_split / self.pts_prefix / f"{info.sample_idx:06d}.bin"
-        points = np.fromfile(v_path, dtype=np.float32)
-        points = points.reshape(-1, 4)
+        v_path = self.path / self.pts_prefix / f"{info.sample_idx:06d}.pt"
+        points = torch.load(v_path)
+        points = LiDARPoints(points, points_dim=points.size(-1))
         return PointCloud(info.sample_idx, lidar2img, points, annos)
 
     def _get_annotation(
@@ -58,17 +70,21 @@ class KittiDataset(IDataset):
             gt_names (list[str]): class names of ground truths.
             difficulty (int): difficulty defined by KITTI. 0, 1, 2 represent xxxxx respectively.
         """
-        # TODO maybe use index to get the annos, thus the evalhook could also use this api
+        # TODO maybe use index to get the annos, thus the evalhook? could also use this api
         annos = _remove_annos_names(annos, "DontCare")
         rots = annos.rotation_y[..., np.newaxis]
-        bboxes_3d = CameraBoxes3D(np.concatenate([annos.location, annos.dimensions, rots], axis=1))
-        bboxes_3d = LiDARBoxes3D.from_camera_box3d(bboxes_3d, rect, trv2c)
+        cam_bboxes3d = np.concatenate(
+            [annos.location, annos.dimensions, rots], axis=1, dtype=np.float32
+        )
+        cam_bboxes3d = CameraBoxes3D(cam_bboxes3d)
+
+        bboxes_3d = LiDARBoxes3D.from_camera_box3d(cam_bboxes3d, rect, trv2c)
         # TODO process when there is plane
 
         labels = [self.CLASSES.index(name) if name in self.CLASSES else -1 for name in annos.names]
         labels = np.array(labels, dtype=np.int32)
         return BoxAnnotation(
-            bboxes_3d, labels, annos.bbox, annos.difficulty, annos.group_ids, annos.names
+            bboxes_3d, labels, annos.bboxes, annos.difficulty, annos.group_ids, annos.names
         )
 
 
@@ -83,7 +99,7 @@ def get_data_path(idx: int, root: Path, info_type: str, suffix: str, training: b
 
 def _remove_annos_names(annos: KittiAnnotation, del_name: str) -> KittiAnnotation:
     """Remove annotations that do not need to be cared."""
-    indices = [i for i, name in enumerate(annos.names) if name != del_name]
+    indices = annos.names != del_name
     replace_dict = {
         field.name: getattr(annos, field.name)[indices]
         for field in dataclasses.fields(KittiAnnotation)

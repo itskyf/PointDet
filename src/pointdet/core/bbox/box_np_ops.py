@@ -67,7 +67,7 @@ def center_to_corner_box3d(
     centers: NDArray[np.float32],
     dims: NDArray[np.float32],
     angles: Optional[NDArray[np.float32]] = None,
-    origin: Optional[tuple[float, ...]] = None,
+    origin: tuple[float, float, float] = (0.5, 1.0, 0.5),
     axis: int = 1,
 ):
     """Convert kitti locations, dimensions and angles to corners.
@@ -87,8 +87,6 @@ def center_to_corner_box3d(
     # 'length' in kitti format is in x axis.
     # yzx(hwl)(kitti label file)<->xyz(lhw)(camera)<->z(-x)(-y)(lwh)(lidar)
     # center in kitti format is [0.5, 1.0, 0.5] in xyz.
-    if origin is None:
-        origin = (0.5, 1.0, 0.5)
     corners = corners_nd(dims, origin=origin)
     # corners: [N, 8, 3]
     if angles is not None:
@@ -252,7 +250,9 @@ def points_in_convex_polygon_3d_jit(points, polygon_surfaces, num_surfaces=None)
     )
 
 
-def points_in_rbbox(points, rbbox, z_axis=2, origin=(0.5, 0.5, 0)):
+def points_in_rbbox(
+    points: NDArray[np.float32], rbbox: NDArray[np.float32], z_axis=2, origin=(0.5, 0.5, 0)
+):
     """Check points in rotated bbox and return indices.
     Note:
         This function is for counterclockwise boxes.

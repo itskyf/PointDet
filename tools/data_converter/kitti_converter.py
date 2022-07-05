@@ -1,9 +1,9 @@
 # Copyright (c) OpenMMLab. All
 import pickle
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
+import torch
 from numpy.typing import NDArray
 from PIL import Image
 from tqdm.contrib.concurrent import thread_map
@@ -15,7 +15,7 @@ from pointdet.datasets.kitti.typing import KittiAnnotation, KittiCalib, KittiInf
 from . import kitti_ops
 
 
-def gen_kitti_info(root: Path, pkl_prefix: str, out_dir: Path):
+def gen_kitti_infos(root: Path, pkl_prefix: str, out_dir: Path):
     """Create info file of KITTI dataset.
     Given the raw data, generate its related info file in pkl format.
     Args:
@@ -36,6 +36,8 @@ def gen_kitti_info(root: Path, pkl_prefix: str, out_dir: Path):
     # Train set
     train_v_dir = out_dir / "training" / "velodyne_reduced"
     train_v_dir.mkdir()
+    pt_v_path = train_v_dir.with_name("velodyne_pt")
+    pt_v_path.mkdir()
 
     kitti_infos_train = _gen_kitti_infos(root, train_img_ids, out_reduce_path=train_v_dir)
     info_path = out_dir / f"{pkl_prefix}_infos_train.pkl"
@@ -58,6 +60,9 @@ def gen_kitti_info(root: Path, pkl_prefix: str, out_dir: Path):
     # Test set
     test_v_dir = out_dir / "testing" / "velodyne_reduced"
     test_v_dir.mkdir()
+    pt_v_path = test_v_dir.with_name("velodyne_pt")
+    pt_v_path.mkdir()
+
     kitti_infos_test = _gen_kitti_infos(
         root, test_img_ids, training=False, get_label=False, out_reduce_path=test_v_dir
     )
@@ -74,10 +79,10 @@ def _extend_matrix(mat: np.ndarray):
 def _gen_kitti_infos(
     root: Path,
     image_ids: list[int],
+    out_reduce_path: Path,
     training: bool = True,
     get_label: bool = True,
     extend_matrix: bool = True,
-    out_reduce_path: Optional[Path] = None,
 ):
     # TODO merge docs with kitti.typing
     """
@@ -103,6 +108,8 @@ def _gen_kitti_infos(
         [optional]group_ids: used for multi-part object
     """
     # TODO num_features variable instead of 4
+    pt_v_path = out_reduce_path.with_name("velodyne_pt")  # TODO consistency with _gen_kitti_info
+
     def map_func(idx: int):
         calib = _get_calib(idx, root, extend_matrix, training)
         rect = calib.r0_rect
@@ -113,12 +120,15 @@ def _gen_kitti_infos(
             img_w, img_h = img.size
         img_shape = np.array((img_h, img_w), dtype=np.int32)
 
-        v_path = get_data_path(idx, root, "velodyne", "bin", training)
-        points = np.fromfile(root / v_path, dtype=np.float32).reshape(-1, 4)
+        v_path = root / get_data_path(idx, root, "velodyne", "bin", training)
+        points = np.fromfile(v_path, dtype=np.float32).reshape(-1, 4)
+        pt_fname = f"{v_path.stem}.pt"
+        v_path = pt_v_path / pt_fname
+        torch.save(torch.from_numpy(points), v_path.with_suffix(".pt"))
         if out_reduce_path is not None:
             points = kitti_ops.remove_outside_points(points, img_shape, rect, trv2c, calib.P2)
-            out_path = out_reduce_path / v_path.name
-            points.tofile(out_path)
+            v_path = out_reduce_path / pt_fname
+            torch.save(torch.from_numpy(points), v_path)
 
         annos = _get_label_anno(idx, root, points, rect, trv2c, training) if get_label else None
         # TODO output plane
@@ -215,16 +225,16 @@ def _get_label_anno(
     num_gt = len(names)
     num_obj = num_gt - names.count("DontCare")
 
-    index = np.concatenate([np.arange(num_obj), np.full(num_gt - num_obj, -1)], dtype=np.int32)
+    indices = np.concatenate([np.arange(num_obj), np.full(num_gt - num_obj, -1)], dtype=np.int32)
     group_ids = np.arange(num_gt, dtype=np.int32)
     truncated = np.array([float(x[1]) for x in content], dtype=np.float32)
     occluded = np.array([int(x[2]) for x in content], dtype=np.int32)
     alpha = np.array([float(x[3]) for x in content], dtype=np.float32)
-    bbox = np.array([[float(info) for info in x[4:8]] for x in content], dtype=np.float32)
+    bboxes = np.array([[float(info) for info in x[4:8]] for x in content], dtype=np.float32)
     # dimensions will convert hwl format to standard lhw(camera) format.
     dimensions = np.array([[float(info) for info in x[8:11]] for x in content], dtype=np.float32)
     dimensions = dimensions[:, [2, 0, 1]]
-    difficuties = _get_anno_difficulty(bbox, dimensions, occluded, truncated)
+    difficuties = _get_anno_difficulty(bboxes, dimensions, occluded, truncated)
     location = np.array([[float(info) for info in x[11:14]] for x in content], dtype=np.float32)
     # location = location.reshape(-1, 3)
     rotation_y = np.array([float(x[14]) for x in content], dtype=np.float32)
@@ -233,7 +243,7 @@ def _get_label_anno(
     score = (
         np.array([float(x[15]) for x in content], dtype=np.float32)  # have score
         if len(content) != 0 and len(content[0]) == 16
-        else np.zeros(bbox.shape[0], dtype=np.float32)
+        else np.zeros(bboxes.shape[0], dtype=np.float32)
     )
 
     # From MMDetection3D's _calculate_num_points_in_gt
@@ -242,19 +252,19 @@ def _get_label_anno(
     rots = rotation_y[:num_obj][..., np.newaxis]
     gt_boxes_camera = np.concatenate([loc, dims, rots], axis=1)
     gt_boxes_lidar = kitti_ops.box_camera_to_lidar(gt_boxes_camera, rect, trv2c)
-    indices = box_np_ops.points_in_rbbox(points[:, :3], gt_boxes_lidar)
+    gt_indices = box_np_ops.points_in_rbbox(points[:, :3], gt_boxes_lidar)
     ignored = np.full(len(dimensions) - num_obj, fill_value=-1, dtype=np.int32)
-    num_gt_points = np.concatenate([indices.sum(axis=0), ignored], dtype=np.int32)
+    num_gt_points = np.concatenate([gt_indices.sum(axis=0), ignored], dtype=np.int32)
 
     return KittiAnnotation(
-        index,
+        indices,
         np.array(names),
         difficuties,
         group_ids,
         truncated,
         occluded,
         alpha,
-        bbox,
+        bboxes,
         dimensions,
         location,
         rotation_y,

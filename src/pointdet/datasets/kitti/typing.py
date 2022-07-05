@@ -18,14 +18,14 @@ class KittiCalib:
 
 @dataclass
 class KittiAnnotation:
-    index: NDArray[np.int32]
+    indices: NDArray[np.int32]
     names: NDArray[np.str_]
     difficulty: NDArray[np.int32]
     group_ids: NDArray[np.int32]
     truncated: NDArray[np.float32]
     occluded: NDArray[np.int32]
     alpha: NDArray[np.float32]
-    bbox: NDArray[np.float32]
+    bboxes: NDArray[np.float32]
     dimensions: NDArray[np.float32]
     location: NDArray[np.float32]
     rotation_y: NDArray[np.float32]

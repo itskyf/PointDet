@@ -6,11 +6,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
-import torch
 from numpy.typing import NDArray
 
 if TYPE_CHECKING:
     from .core.bbox.structures import LiDARBoxes3D
+    from .core.points import LiDARPoints
 
 
 @dataclass
@@ -38,8 +38,8 @@ class PCDAugmentation:
     v_flip: bool = field(init=False)
     # Affine transform
     scale_factor: float = field(init=False)
-    rotation: NDArray[np.float32] = field(init=False)
     rotation_angle: float = field(init=False)
+    # TODO rotation angle
     trans_factor: NDArray[np.float32] = field(init=False)
 
 
@@ -47,8 +47,8 @@ class PCDAugmentation:
 class PointCloud:
     sample_idx: int
     lidar2img: NDArray[np.float32]
-    points: NDArray[np.float32]
-    annos: Optional[BoxAnnotation]
+    points: LiDARPoints
+    annos: Optional[BoxAnnotation] = None
 
     gt_bboxes_3d: LiDARBoxes3D = field(init=False)
     gt_labels_3d: NDArray[np.int32] = field(init=False)
@@ -56,6 +56,7 @@ class PointCloud:
     aug_info: PCDAugmentation = field(default_factory=PCDAugmentation)
 
     def __post_init__(self):
+        """Using this hook to ensure throwing error when augment sample with no annos"""
         if self.annos is not None:
             self.gt_bboxes_3d = self.annos.bboxes_3d
             self.gt_labels_3d = self.annos.labels
@@ -64,7 +65,7 @@ class PointCloud:
 @dataclass
 class DBInfo:
     name: str
-    box3d_lidar: torch.Tensor
+    box3d_lidar: NDArray[np.float32]
     path: Path
     difficulty: int
     gid: int

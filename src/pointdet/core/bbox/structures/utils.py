@@ -20,7 +20,7 @@ def limit_period(val, offset=0.5, period=np.pi):
 
 
 @array_converter(("points", "angles"))
-def rotation_3d_in_axis(points, angles, axis: int = 0, return_mat=False, clockwise=False):
+def rotation_3d_in_axis(points, angles, axis: int = 0, clockwise: bool = False):
     """Rotate points by angles according to axis.
     Args:
         points (np.ndarray | torch.Tensor | list | tuple ):
@@ -37,25 +37,22 @@ def rotation_3d_in_axis(points, angles, axis: int = 0, return_mat=False, clockwi
     Returns:
         (torch.Tensor | np.ndarray): Rotated points in shape (N, M, 3).
     """
-    batch_free = len(points.shape) == 2
+    batch_free = points.ndim == 2
     if batch_free:
         points = points[None]
-
-    if isinstance(angles, float) or len(angles.shape) == 0:
+    if isinstance(angles, float) or angles.ndim == 0:
         angles = torch.full(points.shape[:1], angles)
 
-    assert (
-        len(points.shape) == 3 and len(angles.shape) == 1 and points.shape[0] == angles.shape[0]
-    ), (f"Incorrect shape of points " f"angles: {points.shape}, {angles.shape}")
-
-    assert points.shape[-1] in [2, 3], f"Points size should be 2 or 3 instead of {points.shape[-1]}"
-
+    p_a_shape = f"{points.shape}, {angles.shape}"
+    assert points.ndim == 3 and angles.ndim == 1, f"Incorrect dims: {p_a_shape}"
+    assert points.size(0) == angles.size(0), f"Incorrect shape: {p_a_shape}"
+    assert points.size(-1) in [2, 3], f"Points size should be 2 or 3 instead of {points.size(-1)}"
     rot_sin = torch.sin(angles)
     rot_cos = torch.cos(angles)
     ones = torch.ones_like(rot_cos)
     zeros = torch.zeros_like(rot_cos)
 
-    if points.shape[-1] == 3:
+    if points.size(-1) == 3:
         if axis in (1, -2):
             rot_mat_t = torch.stack(
                 [
@@ -87,14 +84,7 @@ def rotation_3d_in_axis(points, angles, axis: int = 0, return_mat=False, clockwi
 
     if clockwise:
         rot_mat_t = rot_mat_t.transpose(0, 1)
-
-    points_new = points if points.shape[0] == 0 else torch.einsum("aij,jka->aik", points, rot_mat_t)
+    points_new = points if points.size(0) == 0 else torch.einsum("aij,jka->aik", points, rot_mat_t)
     if batch_free:
         points_new = points_new.squeeze(0)
-
-    if return_mat:
-        rot_mat_t = torch.einsum("jka->ajk", rot_mat_t)
-        if batch_free:
-            rot_mat_t = rot_mat_t.squeeze(0)
-        return points_new, rot_mat_t
     return points_new

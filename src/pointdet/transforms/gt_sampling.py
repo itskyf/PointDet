@@ -4,20 +4,22 @@ from pathlib import Path
 from typing import NamedTuple, Optional
 
 import numpy as np
+import torch
 from numpy.typing import NDArray
 
 from ..core.bbox import box_np_ops
+from ..core.points import LiDARPoints
 from ..typing import DBInfo, PointCloud
 from .utils import box_collision_test
 
 DBInfos = dict[str, list[DBInfo]]
 
 
-class DBSamples(NamedTuple):
+class _DBSamples(NamedTuple):
     bboxes_3d: NDArray[np.float32]
     labels_3d: NDArray[np.int32]
-    points: NDArray[np.float32]
     group_ids: NDArray[np.int32]
+    points: torch.Tensor
 
 
 class BatchSampler:
@@ -96,8 +98,8 @@ class DBSampler:
 
     def __init__(
         self,
+        root: Path,
         info_path: Path,
-        data_root: Path,
         rate: float,
         classes: list[str],
         pre_sampling,  # TODO repalce with callable instance using hydra
@@ -105,7 +107,7 @@ class DBSampler:
         rng: np.random.Generator,
     ):
         super().__init__()
-        self.data_root = data_root
+        self.data_root = root
         self.info_path = info_path
         self.rate = rate
         self.name2label = {name: i for i, name in enumerate(classes)}
@@ -127,7 +129,7 @@ class DBSampler:
 
     def __call__(
         self, gt_bboxes: NDArray[np.float32], gt_labels: NDArray[np.int32]
-    ) -> Optional[DBSamples]:
+    ) -> Optional[_DBSamples]:
         """Sampling all categories of bboxes.
 
         Args:
@@ -170,17 +172,17 @@ class DBSampler:
         if len(sampled) == 0:
             return None
 
-        sampled_pts_list = []
+        sampled_pts_tensors = []
         for info in sampled:
             points = np.load(self.data_root / info.path)
             points[:, :3] += info.box3d_lidar[:3]
-            sampled_pts_list.append(points)
+            sampled_pts_tensors.append(points)
         # TODO ground_plane
         sampled_bboxes = np.concatenate(sampled_bboxes)
         sampled_labels = np.array([self.name2label[info.name] for info in sampled], dtype=np.int32)
-        points = np.concatenate(sampled_pts_list)
         group_ids = np.arange(gt_bboxes.shape[0], gt_bboxes.shape[0] + len(sampled))
-        return DBSamples(sampled_bboxes, sampled_labels, points, group_ids)
+        points = torch.cat(sampled_pts_tensors)
+        return _DBSamples(sampled_bboxes, sampled_labels, group_ids, points)
 
     @staticmethod
     def filter_by_difficulty(db_infos: DBInfos, del_difficulties: list[int]) -> DBInfos:
@@ -272,23 +274,6 @@ class GTSampler:
     def __init__(self, db_sampler: DBSampler):
         self.db_sampler = db_sampler
 
-    @staticmethod
-    def _remove_points_in_boxes(
-        points: NDArray[np.float32], boxes: NDArray[np.float32]
-    ) -> NDArray[np.float32]:
-        """Remove the points in the sampled bounding boxes.
-
-        Args:
-            points (:obj:`BasePoints`): Input point cloud array.
-            boxes (np.ndarray): Sampled ground truth boxes.
-
-        Returns:
-            np.ndarray: Points with those in the boxes removed.
-        """
-        xyz = points[:, :3]
-        masks = box_np_ops.points_in_rbbox(xyz, boxes)
-        return points[np.logical_not(masks.any(-1))]
-
     def __call__(self, pcd: PointCloud) -> PointCloud:
         """Call function to sample ground truth objects to the data.
 
@@ -306,13 +291,29 @@ class GTSampler:
         # TODO use ground_plane
         # change to float for blending operation
         # TODO sample 2D
-        sampled: Optional[DBSamples] = self.db_sampler(gt_bboxes_3d, gt_labels_3d)
+        sampled: Optional[_DBSamples] = self.db_sampler(gt_bboxes_3d, gt_labels_3d)
         if sampled is not None:
             # Add sampled boxes to scene
-            pcd.gt_bboxes_3d = pcd.gt_bboxes_3d.new_box(
+            pcd.gt_bboxes_3d = pcd.gt_bboxes_3d.new_boxes(
                 np.concatenate([gt_bboxes_3d, sampled.bboxes_3d])
             )
             pcd.gt_labels_3d = np.concatenate([gt_labels_3d, sampled.labels_3d])
-            points = self._remove_points_in_boxes(pcd.points, sampled.bboxes_3d)
-            pcd.points = np.concatenate([sampled.points, points])
+            points = _remove_points_in_boxes(pcd.points, sampled.bboxes_3d)
+            attr_dims = points.attr_dims
+            points = torch.cat([sampled.points, points.tensor])
+            pcd.points = LiDARPoints(points, points_dim=points.size(1), attr_dims=attr_dims)
         return pcd
+
+
+def _remove_points_in_boxes(points: LiDARPoints, boxes: NDArray[np.float32]) -> LiDARPoints:
+    """Remove the points in the sampled bounding boxes.
+
+    Args:
+        points (:obj:`BasePoints`): Input point cloud array.
+        boxes (np.ndarray): Sampled ground truth boxes.
+
+    Returns:
+        np.ndarray: Points with those in the boxes removed.
+    """
+    masks = box_np_ops.points_in_rbbox(points.coor.numpy(), boxes)
+    return points[np.logical_not(masks.any(-1))]

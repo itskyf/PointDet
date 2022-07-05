@@ -1,10 +1,12 @@
 import copy
 import pickle
+from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple, Optional
 
 import numpy as np
 import torch
+from hydra.core.config_store import ConfigStore
 from numpy.typing import NDArray
 
 from ..core.bbox import box_np_ops
@@ -13,6 +15,7 @@ from ..typing import DBInfo, PointCloud
 from .utils import box_collision_test
 
 DBInfos = dict[str, list[DBInfo]]
+cs = ConfigStore.instance()
 
 
 class _DBSamples(NamedTuple):
@@ -84,6 +87,19 @@ class BatchSampler:
         self._idx = 0
 
 
+@dataclass
+class DBSamplerConf:
+    root: Path
+    info_name: str
+    rate: float
+    classes: list[str]
+    min_points: dict[str, int]  # TODO better typing
+    sample_groups: dict[str, int]
+
+
+cs.store(name="db_sampler", node=DBSamplerConf)
+
+
 class DBSampler:
     """Class for sampling data from the ground truth database.
 
@@ -99,29 +115,31 @@ class DBSampler:
     def __init__(
         self,
         root: Path,
-        info_path: Path,
+        info_name: Path,
         rate: float,
         classes: list[str],
-        pre_sampling,  # TODO repalce with callable instance using hydra
+        min_points: dict[str, int],  # TODO repalce with callable instance using hydra
         sample_groups: dict[str, int],
-        rng: np.random.Generator,
+        seed: Optional[int] = None,
     ):
         super().__init__()
         self.data_root = root
-        self.info_path = info_path
+        self.info_path = root / info_name
         self.rate = rate
         self.name2label = {name: i for i, name in enumerate(classes)}
         self.label2name = dict(enumerate(classes))
 
         # TODO logging
         # Filter database infos
-        with info_path.open("rb") as info_file:
+        with self.info_path.open("rb") as info_file:
             db_infos: DBInfos = pickle.load(info_file)
-        for prep_func, args in pre_sampling.items():
-            db_infos: DBInfos = getattr(self, prep_func)(db_infos, args)
+        # TODO medium remove hardcode preparation
+        db_infos = self.filter_by_difficulty(db_infos, [-1])
+        db_infos = self.filter_by_min_points(db_infos, min_points)
 
         self.sample_classes = list(sample_groups.keys())
         self.sample_max_nums = list(sample_groups.values())
+        rng = np.random.default_rng(seed)
         self._sampler_dict = {
             cls_name: BatchSampler(cls_infos, cls_name, rng)
             for cls_name, cls_infos in db_infos.items()

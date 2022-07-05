@@ -22,8 +22,8 @@ class KittiDataset(IDataset):
         info_name: str,
         pts_prefix: str,
         *,
-        rng: np.random.Generator,
         transforms: Optional[Callable[[PointCloud], PointCloud]] = None,
+        seed: Optional[int] = None,
     ):
         info_path = root / info_name
         info_name = info_path.name
@@ -33,7 +33,7 @@ class KittiDataset(IDataset):
             split = "testing"
         else:
             raise ValueError(f"Cannot detect split from info path {info_path}")
-        super().__init__(info_path, rng, transforms, training="train" in info_name)
+        super().__init__(info_path, transforms, training="train" in info_name, seed=seed)
 
         self.path = root / split
         self.pts_prefix = pts_prefix

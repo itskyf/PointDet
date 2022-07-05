@@ -6,6 +6,7 @@ channels:
   - conda-forge
 dependencies:
   - cudatoolkit=11.6
+  - hydra-core
   - numba
   - pillow
   - pip
@@ -28,4 +29,3 @@ dependencies:
   - ninja
   - pip:
       - git+https://github.com/facebookresearch/hydra#subdirectory=contrib/hydra_torchrun_launcher
-      - hydra-core

@@ -1,5 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from typing import Callable, Union
+from typing import Callable, Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -36,13 +36,13 @@ class GlobalRotScaleTrans:
 
     def __init__(
         self,
-        rng: np.random.Generator,
         rot_range: tuple[float, float] = (-np.pi / 4, np.pi / 4),
         scale_ratio_range: tuple[float, float] = (0.95, 1.05),
         translation_std: tuple[float, float, float] = (0, 0, 0),
+        seed: Optional[int] = None,
     ):
         assert all(std >= 0 for std in translation_std), "translation_std should be positive"
-        self.rng = rng
+        self.rng = np.random.default_rng(seed)
         self.rot_range = rot_range
         self.scale_ratio_range = scale_ratio_range
         self.translation_std = np.array(translation_std, dtype=np.float32)
@@ -183,8 +183,8 @@ class PointsRangeFilter:
 class PointsShuffle:
     """Shuffle input points."""
 
-    def __init__(self, rng: np.random.Generator):
-        self.rng = rng
+    def __init__(self, seed: Optional[int] = None):
+        self.rng = np.random.default_rng(seed)
 
     def __call__(self, pcd: PointCloud) -> PointCloud:
         """Call function to shuffle points.
@@ -239,7 +239,7 @@ class RandomFlip:
         self,
         flip_ratio: Union[float, list[float]],
         direction: Union[FlipDirection, list[FlipDirection]],
-        rng: np.random.Generator,
+        seed: Optional[int] = None,
     ):
         if isinstance(flip_ratio, list):
             assert isinstance(direction, list) and len(flip_ratio) == len(direction)
@@ -252,7 +252,7 @@ class RandomFlip:
         self.directions = [*direction, None] if isinstance(direction, list) else [direction, None]
         self.num_direction = len(self.directions) - 1
         self.flip_ratio = flip_ratio
-        self.rng = rng
+        self.rng = np.random.default_rng(seed)
 
     def bbox_flip(
         self, bboxes: NDArray[np.float32], img_shape: tuple[int, int], direction: FlipDirection
@@ -334,13 +334,13 @@ class RandomFlip3D(RandomFlip):
 
     def __init__(
         self,
-        rng: np.random.Generator,
         h_bev_flip_ratio: float = 0.0,
         v_bev_flip_ratio: float = 0.0,
         sync_2d: bool = True,
+        seed: Optional[int] = None,
     ):
         assert 0 <= h_bev_flip_ratio <= 1 and 0 <= v_bev_flip_ratio <= 1
-        super().__init__(h_bev_flip_ratio, FlipDirection.HORIZONTAL, rng)
+        super().__init__(h_bev_flip_ratio, FlipDirection.HORIZONTAL, seed)
         self.sync_2d = sync_2d
         self.v_bev_flip_ratio = v_bev_flip_ratio
 

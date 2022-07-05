@@ -25,17 +25,17 @@ class ObjectNoise:
 
     def __init__(
         self,
-        rng: np.random.Generator,
         translation_std: tuple[float, float, float] = (0.25, 0.25, 0.25),
         global_rot_range: tuple[float, float] = (0.0, 0.0),
         rot_range: tuple[float, float] = (-0.15707963267, 0.15707963267),
         num_try: int = 100,
+        seed: Optional[int] = None,
     ):
         self.translation_std = translation_std
         self.global_rot_range = global_rot_range
         self.rot_range = rot_range
         self.num_try = num_try
-        self.rng = rng
+        self.rng = np.random.default_rng(seed)
 
     def __call__(self, pcd: PointCloud) -> PointCloud:
         """Call function to apply noise to each ground truth in the scene.

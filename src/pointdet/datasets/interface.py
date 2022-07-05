@@ -16,13 +16,13 @@ class IDataset(ABC, Dataset):
     def __init__(
         self,
         info_path: Path,
-        rng: np.random.Generator,
         transforms: Optional[Callable[[PointCloud], PointCloud]],
         training: bool,
+        seed: Optional[int] = None,
     ):
         with info_path.open("rb") as info_file:
             self.infos = pickle.load(info_file)
-        self.rng = rng
+        self.rng = np.random.default_rng(seed)
         self.training = training
         self.transforms = transforms if transforms is not None else Compose([])
 

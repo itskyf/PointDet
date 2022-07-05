@@ -55,9 +55,8 @@ def create_groundtruth_database(
     database_dir.mkdir()
     info_name = f"{info_prefix}_infos_train.pkl"
 
-    rng = np.random.default_rng()
     if dataset_enum is DatasetEnum.KITTI:
-        dataset = KittiDataset(root, info_name, "velodyne_pt", rng=rng)
+        dataset = KittiDataset(root, info_name, "velodyne_pt")
     else:
         raise NotImplementedError
 

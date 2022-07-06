@@ -1,12 +1,10 @@
 import copy
 import pickle
-from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple, Optional
 
 import numpy as np
 import torch
-from hydra.core.config_store import ConfigStore
 from numpy.typing import NDArray
 
 from ..core.bbox import box_np_ops
@@ -15,7 +13,6 @@ from ..typing import DBInfo, PointCloud
 from .utils import box_collision_test
 
 DBInfos = dict[str, list[DBInfo]]
-cs = ConfigStore.instance()
 
 
 class _DBSamples(NamedTuple):
@@ -87,19 +84,6 @@ class BatchSampler:
         self._idx = 0
 
 
-@dataclass
-class DBSamplerConf:
-    root: Path
-    info_name: str
-    rate: float
-    classes: list[str]
-    min_points: dict[str, int]  # TODO better typing
-    sample_groups: dict[str, int]
-
-
-cs.store(name="db_sampler", node=DBSamplerConf)
-
-
 class DBSampler:
     """Class for sampling data from the ground truth database.
 
@@ -115,7 +99,7 @@ class DBSampler:
     def __init__(
         self,
         root: Path,
-        info_name: Path,
+        info_name: str,
         rate: float,
         classes: list[str],
         min_points: dict[str, int],  # TODO repalce with callable instance using hydra
@@ -192,7 +176,7 @@ class DBSampler:
 
         sampled_pts_tensors = []
         for info in sampled:
-            points = np.load(self.data_root / info.path)
+            points = torch.load(self.data_root / info.path)
             points[:, :3] += info.box3d_lidar[:3]
             sampled_pts_tensors.append(points)
         # TODO ground_plane
@@ -290,6 +274,7 @@ class GTSampler:
     """
 
     def __init__(self, db_sampler: DBSampler):
+        # TODO directly instantiate
         self.db_sampler = db_sampler
 
     def __call__(self, pcd: PointCloud) -> PointCloud:
@@ -333,5 +318,5 @@ def _remove_points_in_boxes(points: LiDARPoints, boxes: NDArray[np.float32]) -> 
     Returns:
         np.ndarray: Points with those in the boxes removed.
     """
-    masks = box_np_ops.points_in_rbbox(points.coor.numpy(), boxes)
+    masks = box_np_ops.points_in_rbbox(points.coord.numpy(), boxes)
     return points[np.logical_not(masks.any(-1))]

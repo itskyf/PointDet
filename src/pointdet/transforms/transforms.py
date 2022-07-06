@@ -172,11 +172,11 @@ class PointsRangeFilter:
             dict: Results after filtering, 'points', 'pts_instance_mask'
                 and 'pts_semantic_mask' keys are updated in the result dict.
         """
-        bev = pcd.points.bev
-        x_mask = (bev[:, 0] > self.pcd_range[0]) & (bev[:, 0] < self.pcd_range[3])
-        y_mask = (bev[:, 1] > self.pcd_range[1]) & (bev[:, 1] < self.pcd_range[4])
-        z_mask = (bev[:, 2] > self.pcd_range[2]) & (bev[:, 2] < self.pcd_range[5])
-        pcd.points = pcd.points.new_points(bev[x_mask & y_mask & z_mask])
+        tensor = pcd.points.tensor
+        x_mask = (tensor[:, 0] > self.pcd_range[0]) & (tensor[:, 0] < self.pcd_range[3])
+        y_mask = (tensor[:, 1] > self.pcd_range[1]) & (tensor[:, 1] < self.pcd_range[4])
+        z_mask = (tensor[:, 2] > self.pcd_range[2]) & (tensor[:, 2] < self.pcd_range[5])
+        pcd.points = pcd.points.new_points(tensor[x_mask & y_mask & z_mask])
         return pcd
 
 

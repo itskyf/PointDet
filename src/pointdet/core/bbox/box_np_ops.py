@@ -21,7 +21,7 @@ def box2d_to_corner_jit(boxes: NDArray[np.float32]):
     corners_norm[2] = 1.0
     corners_norm[3, 0] = 1.0
     corners_norm -= np.array([0.5, 0.5], dtype=boxes.dtype)
-    corners = boxes.reshape(num_box, 1, 5)[:, :, 2:4] * corners_norm.reshape(1, 4, 2)
+    corners = boxes.reshape(num_box, 1, 5)[:, :, 2:4] * np.expand_dims(corners_norm, 0)
     rot_mat_t = np.zeros((2, 2), dtype=boxes.dtype)
     box_corners = np.zeros((num_box, 4, 2), dtype=boxes.dtype)
     for i in range(num_box):

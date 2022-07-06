@@ -19,23 +19,18 @@ class KittiDataset(IDataset):
     def __init__(
         self,
         root: Path,
-        info_name: str,
+        split: str,
         pts_prefix: str,
+        info_prefix: str = "kitti",
         *,
         transforms: Optional[Callable[[PointCloud], PointCloud]] = None,
         seed: Optional[int] = None,
     ):
-        info_path = root / info_name
-        info_name = info_path.name
-        if "train" in info_name or "val" in info_name:
-            split = "training"
-        elif "test" in info_name:
-            split = "testing"
-        else:
-            raise ValueError(f"Cannot detect split from info path {info_path}")
-        super().__init__(info_path, transforms, training="train" in info_name, seed=seed)
+        assert split in ("train", "val", "test")
+        info_path = root / f"{info_prefix}_infos_{split}.pkl"
+        super().__init__(info_path, transforms, training=split == "train", seed=seed)
 
-        self.path = root / split
+        self.path = root / ("testing" if split == "test" else "training")
         self.pts_prefix = pts_prefix
 
     def _get_sample(self, info: KittiInfo) -> PointCloud:

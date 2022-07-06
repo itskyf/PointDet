@@ -162,5 +162,9 @@ class IPoints(ABC):
             :obj:`BasePoints`: A new point object with ``data``,
                 the object's other properties are similar to ``self``.
         """
-        new_tensor = self.tensor.new_tensor(data)
+        new_tensor = (
+            self.tensor.new_tensor(data)
+            if not isinstance(data, torch.Tensor)
+            else data.to(self.tensor.device)
+        )
         return type(self)(new_tensor, self.points_dim, self.attr_dims)

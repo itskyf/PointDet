@@ -134,5 +134,9 @@ class IBoxes3D(ABC):
             :obj:`BaseInstance3DBoxes`: A new bbox object with ``data``,
                 the object's other properties are similar to ``self``.
         """
-        new_tensor = self.tensor.new_tensor(data)
+        new_tensor = (
+            self.tensor.new_tensor(data)
+            if not isinstance(data, torch.Tensor)
+            else data.to(self.tensor.device)
+        )
         return type(self)(new_tensor, box_dim=self.box_dim, with_yaw=self.with_yaw)

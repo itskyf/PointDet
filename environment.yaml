@@ -8,6 +8,7 @@ dependencies:
   - cudatoolkit=11.6
   - hydra-core
   - numba
+  - scipy # for numba linear algebra
   - pillow
   - pip
   - python=3.9

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
+import torch
 from numpy.typing import NDArray
 
 if TYPE_CHECKING:
@@ -65,7 +66,7 @@ class PointCloud:
 @dataclass
 class DBInfo:
     name: str
-    box3d_lidar: NDArray[np.float32]
+    box3d_lidar: torch.Tensor
     path: Path
     difficulty: int
     gid: int

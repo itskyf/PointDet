@@ -4,7 +4,6 @@ import pickle
 from collections import defaultdict
 from pathlib import Path
 
-import numpy as np
 import torch
 from tqdm.auto import trange
 
@@ -53,10 +52,9 @@ def create_groundtruth_database(
     rel_dir = Path(f"{info_prefix}_gt_database")
     database_dir = root / rel_dir
     database_dir.mkdir()
-    info_name = f"{info_prefix}_infos_train.pkl"
 
     if dataset_enum is DatasetEnum.KITTI:
-        dataset = KittiDataset(root, info_name, "velodyne_pt")
+        dataset = KittiDataset(root, "train", "velodyne_pt", info_prefix)
     else:
         raise NotImplementedError
 
@@ -71,9 +69,9 @@ def create_groundtruth_database(
         group_ids = pcd.annos.group_ids
         names = pcd.annos.names
 
-        bboxes_3d = pcd.gt_bboxes_3d.tensor.numpy()
-        points = pcd.points.tensor.numpy()
-        point_indices = box_np_ops.points_in_rbbox(points, bboxes_3d)
+        bboxes_3d = pcd.gt_bboxes_3d.tensor
+        points = pcd.points.tensor
+        point_indices = box_np_ops.points_in_rbbox(points.numpy(), bboxes_3d.numpy())
 
         group_dict = {}
         img_idx = pcd.sample_idx

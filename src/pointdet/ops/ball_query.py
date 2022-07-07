@@ -23,7 +23,7 @@ class _ball_query(Function):
         ctx,
         centers: torch.Tensor,
         points: torch.Tensor,
-        num_samples: int,
+        num_neighbors: int,
         radius: float,
         lengths1: torch.Tensor,
         lengths2: torch.Tensor,
@@ -31,7 +31,7 @@ class _ball_query(Function):
         """
         Arguments defintions the same as in the ball_query function
         """
-        idx = _C.ball_query(centers, points, lengths1, lengths2, num_samples, radius)
+        idx = _C.ball_query(centers, points, lengths1, lengths2, num_neighbors, radius)
         ctx.mark_non_differentiable(idx)
         return idx
 
@@ -44,8 +44,8 @@ class _ball_query(Function):
 def ball_query(
     centers: torch.Tensor,
     points: torch.Tensor,
-    num_samples: int = 500,
-    radius: float = 0.2,
+    num_neighbors: int,
+    radius: float,
     lengths1: Optional[torch.Tensor] = None,
     lengths2: Optional[torch.Tensor] = None,
 ):
@@ -71,24 +71,19 @@ def ball_query(
         on Point Sets in a Metric Space", NeurIPS 2017.
 
     Args:
-        p1: Tensor of shape (N, P1, D) giving a batch of N point clouds, each containing
+        p1: Tensor of shape (B, P1, D) giving a batch of B point clouds, each containing
             up to P1 points of dimension D. These represent the centers of the ball queries.
-        p2: Tensor of shape (N, P2, D) giving a batch of N point clouds, each containing
+        p2: Tensor of shape (B, P2, D) giving a batch of B point clouds, each containing
             up to P2 points of dimension D.
         num_samples: upper bound on the number of samples to take within the radius
         radius: the radius around each point within which the neighbors need to be located
-        lengths1: LongTensor of shape (N,) of values in the range [0, P1], giving the length
+        lengths1: LongTensor of shape (B,) of values in the range [0, P1], giving the length
             of each pointcloud in p1. Or None to indicate that every cloud has length P1.
-        lengths2: LongTensor of shape (N,) of values in the range [0, P2], giving the length
+        lengths2: LongTensor of shape (B,) of values in the range [0, P2], giving the length
             of each pointcloud in p2. Or None to indicate that every cloud has length P2.
 
     Returns:
-        dists: Tensor of shape (N, P1, K) giving the squared distances to
-            the neighbors. This is padded with zeros both where a cloud in p2
-            has fewer than S points and where a cloud in p1 has fewer than P1 points
-            and also if there are fewer than K points which satisfy the radius threshold.
-
-        idx: LongTensor (N, P1, K) giving the indices of the S neighbors in p2 for points in p1.
+        indices: LongTensor (B, P1, K) giving the indices of S neighbors in p2 for points in p1.
             Concretely, if `p1_idx[n, i, k] = j` then `p2[n, j]` is the k-th
             neighbor to `p1[n, i]` in `p2[n]`. This is padded with -1 both where a cloud
             in p2 has fewer than S points and where a cloud in p1 has fewer than P1 points
@@ -101,14 +96,14 @@ def ball_query(
 
     num_centers = centers.size(1)
     num_points = points.size(1)
-    N = centers.size(0)
+    batch_size = centers.size(0)
 
     device = centers.device
     if lengths1 is None:
-        lengths1 = torch.full((N,), num_centers, dtype=torch.int64, device=device)
+        lengths1 = torch.full((batch_size,), num_centers, dtype=torch.int64, device=device)
     if lengths2 is None:
-        lengths2 = torch.full((N,), num_points, dtype=torch.int64, device=device)
+        lengths2 = torch.full((batch_size,), num_points, dtype=torch.int64, device=device)
 
     # pyre-fixme[16]: `_ball_query` has no attribute `apply`.
-    idx = _ball_query.apply(centers, points, num_samples, radius, lengths1, lengths2)
-    return idx
+    indices = _ball_query.apply(centers, points, num_neighbors, radius, lengths1, lengths2)
+    return indices

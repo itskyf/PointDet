@@ -9,6 +9,7 @@
 #include <torch/extension.h>
 
 #include "ball_query/ball_query.hpp"
+#include "group_points/group_points.hpp"
 #include "knn/knn.hpp"
 #include "sample_farthest_points/sample_farthest_points.hpp"
 
@@ -19,5 +20,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("knn_points_idx", &KNearestNeighborIdx);
   m.def("knn_points_backward", &KNearestNeighborBackward);
   m.def("ball_query", &BallQuery);
+  m.def("group_points", &GroupPoints);
+  m.def("group_points_backward", &GroupPointsBackward);
   m.def("sample_farthest_points", &FarthestPointSampling);
 }

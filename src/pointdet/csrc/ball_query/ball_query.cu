@@ -5,7 +5,6 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
@@ -68,17 +67,16 @@ at::Tensor BallQueryCuda(const at::Tensor& p1,        // (N, P1, 3)
                          const at::Tensor& lengths2,  // (N,)
                          int K, float radius) {
   // Check inputs are on the same device
-  at::TensorArg p1_t{p1, "p1", 1}, p2_t{p2, "p2", 2}, lengths1_t{lengths1, "lengths1", 3},
-      lengths2_t{lengths2, "lengths2", 4};
+  at::TensorArg p1_t{p1, "p1", 1}, p2_t{p2, "p2", 2};
+  at::TensorArg lengths1_t{lengths1, "lengths1", 3}, lengths2_t{lengths2, "lengths2", 4};
   at::CheckedFrom c = "BallQueryCuda";
   at::checkAllSameGPU(c, {p1_t, p2_t, lengths1_t, lengths2_t});
   at::checkAllSameType(c, {p1_t, p2_t});
+  TORCH_CHECK(p2.size(2) == p1.size(2), "Point sets must have the same last dimension");
 
   // Set the device for the kernel launch based on the device of p1
   at::cuda::CUDAGuard device_guard(p1.device());
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-
-  TORCH_CHECK(p2.size(2) == p1.size(2), "Point sets must have the same last dimension");
 
   const int N = p1.size(0);
   const int P1 = p1.size(1);
@@ -97,15 +95,14 @@ at::Tensor BallQueryCuda(const at::Tensor& p1,        // (N, P1, 3)
   constexpr size_t blocks = 256;
   constexpr size_t threads = 256;
 
-  AT_DISPATCH_FLOATING_TYPES(p1.scalar_type(), "ball_query_kernel_cuda", ([&] {
-                               BallQueryKernel<<<blocks, threads, 0, stream>>>(
-                                   p1.packed_accessor64<float, 3, at::RestrictPtrTraits>(),
-                                   p2.packed_accessor64<float, 3, at::RestrictPtrTraits>(),
-                                   lengths1.packed_accessor64<int64_t, 1, at::RestrictPtrTraits>(),
-                                   lengths2.packed_accessor64<int64_t, 1, at::RestrictPtrTraits>(),
-                                   idxs.packed_accessor64<int64_t, 3, at::RestrictPtrTraits>(),
-                                   K_64, radius2);
-                             }));
+  AT_DISPATCH_FLOATING_TYPES(p1.scalar_type(), "ball_query_kernel_cuda", [&] {
+    BallQueryKernel<<<blocks, threads, 0, stream>>>(
+        p1.packed_accessor64<float, 3, at::RestrictPtrTraits>(),
+        p2.packed_accessor64<float, 3, at::RestrictPtrTraits>(),
+        lengths1.packed_accessor64<int64_t, 1, at::RestrictPtrTraits>(),
+        lengths2.packed_accessor64<int64_t, 1, at::RestrictPtrTraits>(),
+        idxs.packed_accessor64<int64_t, 3, at::RestrictPtrTraits>(), K_64, radius2);
+  });
   AT_CUDA_CHECK(cudaGetLastError());
   return idxs;
 }

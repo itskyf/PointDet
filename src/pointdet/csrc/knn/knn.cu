@@ -5,7 +5,6 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
@@ -313,42 +312,38 @@ std::tuple<at::Tensor, at::Tensor> KNearestNeighborIdxCuda(
   const size_t threads = 256;
   const size_t blocks = 256;
   if (version == 0) {
-    AT_DISPATCH_FLOATING_TYPES(
-        p1.scalar_type(), "knn_kernel_cuda", ([&] {
-          KNearestNeighborKernelV0<scalar_t><<<blocks, threads, 0, stream>>>(
-              p1.contiguous().data_ptr<scalar_t>(), p2.contiguous().data_ptr<scalar_t>(),
-              lengths1.contiguous().data_ptr<int64_t>(), lengths2.contiguous().data_ptr<int64_t>(),
-              dists.data_ptr<scalar_t>(), idxs.data_ptr<int64_t>(), N, P1, P2, D, K, norm);
-        }));
+    AT_DISPATCH_FLOATING_TYPES(p1.scalar_type(), "knn_kernel_cuda", [&] {
+      KNearestNeighborKernelV0<scalar_t><<<blocks, threads, 0, stream>>>(
+          p1.contiguous().data_ptr<scalar_t>(), p2.contiguous().data_ptr<scalar_t>(),
+          lengths1.contiguous().data_ptr<int64_t>(), lengths2.contiguous().data_ptr<int64_t>(),
+          dists.data_ptr<scalar_t>(), idxs.data_ptr<int64_t>(), N, P1, P2, D, K, norm);
+    });
   } else if (version == 1) {
-    AT_DISPATCH_FLOATING_TYPES(
-        p1.scalar_type(), "knn_kernel_cuda", ([&] {
-          DispatchKernel1D<KNearestNeighborV1Functor, scalar_t, V1_MIN_D, V1_MAX_D>(
-              D, blocks, threads, p1.contiguous().data_ptr<scalar_t>(),
-              p2.contiguous().data_ptr<scalar_t>(), lengths1.contiguous().data_ptr<int64_t>(),
-              lengths2.contiguous().data_ptr<int64_t>(), dists.data_ptr<scalar_t>(),
-              idxs.data_ptr<int64_t>(), N, P1, P2, K, norm);
-        }));
+    AT_DISPATCH_FLOATING_TYPES(p1.scalar_type(), "knn_kernel_cuda", [&] {
+      DispatchKernel1D<KNearestNeighborV1Functor, scalar_t, V1_MIN_D, V1_MAX_D>(
+          D, blocks, threads, p1.contiguous().data_ptr<scalar_t>(),
+          p2.contiguous().data_ptr<scalar_t>(), lengths1.contiguous().data_ptr<int64_t>(),
+          lengths2.contiguous().data_ptr<int64_t>(), dists.data_ptr<scalar_t>(),
+          idxs.data_ptr<int64_t>(), N, P1, P2, K, norm);
+    });
   } else if (version == 2) {
-    AT_DISPATCH_FLOATING_TYPES(
-        p1.scalar_type(), "knn_kernel_cuda", ([&] {
-          DispatchKernel2D<KNearestNeighborKernelV2Functor, scalar_t, V2_MIN_D, V2_MAX_D, V2_MIN_K,
-                           V2_MAX_K>(
-              D, K_64, blocks, threads, p1.contiguous().data_ptr<scalar_t>(),
-              p2.contiguous().data_ptr<scalar_t>(), lengths1.contiguous().data_ptr<int64_t>(),
-              lengths2.contiguous().data_ptr<int64_t>(), dists.data_ptr<scalar_t>(),
-              idxs.data_ptr<int64_t>(), N, P1, P2, norm);
-        }));
+    AT_DISPATCH_FLOATING_TYPES(p1.scalar_type(), "knn_kernel_cuda", [&] {
+      DispatchKernel2D<KNearestNeighborKernelV2Functor, scalar_t, V2_MIN_D, V2_MAX_D, V2_MIN_K,
+                       V2_MAX_K>(
+          D, K_64, blocks, threads, p1.contiguous().data_ptr<scalar_t>(),
+          p2.contiguous().data_ptr<scalar_t>(), lengths1.contiguous().data_ptr<int64_t>(),
+          lengths2.contiguous().data_ptr<int64_t>(), dists.data_ptr<scalar_t>(),
+          idxs.data_ptr<int64_t>(), N, P1, P2, norm);
+    });
   } else if (version == 3) {
-    AT_DISPATCH_FLOATING_TYPES(
-        p1.scalar_type(), "knn_kernel_cuda", ([&] {
-          DispatchKernel2D<KNearestNeighborKernelV3Functor, scalar_t, V3_MIN_D, V3_MAX_D, V3_MIN_K,
-                           V3_MAX_K>(
-              D, K_64, blocks, threads, p1.contiguous().data_ptr<scalar_t>(),
-              p2.contiguous().data_ptr<scalar_t>(), lengths1.contiguous().data_ptr<int64_t>(),
-              lengths2.contiguous().data_ptr<int64_t>(), dists.data_ptr<scalar_t>(),
-              idxs.data_ptr<int64_t>(), N, P1, P2, norm);
-        }));
+    AT_DISPATCH_FLOATING_TYPES(p1.scalar_type(), "knn_kernel_cuda", [&] {
+      DispatchKernel2D<KNearestNeighborKernelV3Functor, scalar_t, V3_MIN_D, V3_MAX_D, V3_MIN_K,
+                       V3_MAX_K>(
+          D, K_64, blocks, threads, p1.contiguous().data_ptr<scalar_t>(),
+          p2.contiguous().data_ptr<scalar_t>(), lengths1.contiguous().data_ptr<int64_t>(),
+          lengths2.contiguous().data_ptr<int64_t>(), dists.data_ptr<scalar_t>(),
+          idxs.data_ptr<int64_t>(), N, P1, P2, norm);
+    });
   }
   AT_CUDA_CHECK(cudaGetLastError());
   return std::make_tuple(idxs, dists);

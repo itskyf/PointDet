@@ -11,7 +11,7 @@
 
 #include <tuple>
 
-#include "utils/pytorch3d_cutils.h"
+#include "utils/cuda_utils.hpp"
 
 // Compute indices of K neighbors in pointcloud p2 to points
 // in pointcloud p1 which fall within a specified radius
@@ -42,33 +42,28 @@
 //        p2[n, p1_neighbor_idx[n, p, k], :].
 
 // CPU implementation
-std::tuple<at::Tensor, at::Tensor> BallQueryCpu(const at::Tensor& p1, const at::Tensor& p2,
-                                                const at::Tensor& lengths1,
-                                                const at::Tensor& lengths2, const int K,
-                                                const float radius);
+at::Tensor BallQueryCpu(const at::Tensor& p1, const at::Tensor& p2, const at::Tensor& lengths1,
+                        const at::Tensor& lengths2, const int K, const float radius);
 
 // CUDA implementation
-std::tuple<at::Tensor, at::Tensor> BallQueryCuda(const at::Tensor& p1, const at::Tensor& p2,
-                                                 const at::Tensor& lengths1,
-                                                 const at::Tensor& lengths2, const int K,
-                                                 const float radius);
+at::Tensor BallQueryCuda(const at::Tensor& p1, const at::Tensor& p2, const at::Tensor& lengths1,
+                         const at::Tensor& lengths2, const int K, const float radius);
 
 // Implementation which is exposed
 // Note: the backward pass reuses the KNearestNeighborBackward kernel
-inline std::tuple<at::Tensor, at::Tensor> BallQuery(const at::Tensor& p1, const at::Tensor& p2,
-                                                    const at::Tensor& lengths1,
-                                                    const at::Tensor& lengths2, int K,
-                                                    float radius) {
-  if (p1.is_cuda() || p2.is_cuda()) {
+inline at::Tensor BallQuery(const at::Tensor& centers, const at::Tensor& points,
+                            const at::Tensor& lengths1, const at::Tensor& lengths2,
+                            const int num_samples, const float radius) {
+  if (centers.is_cuda() || points.is_cuda()) {
 #ifdef WITH_CUDA
-    CHECK_CUDA(p1);
-    CHECK_CUDA(p2);
-    return BallQueryCuda(p1.contiguous(), p2.contiguous(), lengths1.contiguous(),
-                         lengths2.contiguous(), K, radius);
+    CHECK_CUDA(centers);
+    CHECK_CUDA(points);
+    return BallQueryCuda(centers, points, lengths1.contiguous(), lengths2.contiguous(), num_samples,
+                         radius);
 #else
-    AT_ERROR("Not compiled with GPU support.");
+    AT_ERROR("Not compiled with GPU support");
 #endif
   }
-  return BallQueryCpu(p1.contiguous(), p2.contiguous(), lengths1.contiguous(),
-                      lengths2.contiguous(), K, radius);
+  return BallQueryCpu(centers, points, lengths1.contiguous(), lengths2.contiguous(), num_samples,
+                      radius);
 }

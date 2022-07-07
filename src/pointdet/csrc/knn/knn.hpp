@@ -11,7 +11,7 @@
 
 #include <tuple>
 
-#include "utils/pytorch3d_cutils.h"
+#include "utils/cuda_utils.hpp"
 
 // Compute indices of K nearest neighbors in pointcloud p2 to points
 // in pointcloud p1.
@@ -61,7 +61,7 @@ std::tuple<at::Tensor, at::Tensor> KNearestNeighborIdx(const at::Tensor& p1, con
     CHECK_CUDA(p2);
     return KNearestNeighborIdxCuda(p1, p2, lengths1, lengths2, norm, K, version);
 #else
-    AT_ERROR("Not compiled with GPU support.");
+    AT_ERROR("Not compiled with GPU support");
 #endif
   }
   return KNearestNeighborIdxCpu(p1, p2, lengths1, lengths2, norm, K);
@@ -116,7 +116,7 @@ std::tuple<at::Tensor, at::Tensor> KNearestNeighborBackward(const at::Tensor& p1
     CHECK_CUDA(p2);
     return KNearestNeighborBackwardCuda(p1, p2, lengths1, lengths2, idxs, norm, grad_dists);
 #else
-    AT_ERROR("Not compiled with GPU support.");
+    AT_ERROR("Not compiled with GPU support");
 #endif
   }
   return KNearestNeighborBackwardCpu(p1, p2, lengths1, lengths2, idxs, norm, grad_dists);

@@ -11,16 +11,14 @@
 #include <queue>
 #include <tuple>
 
-std::tuple<at::Tensor, at::Tensor> BallQueryCpu(const at::Tensor& p1, const at::Tensor& p2,
-                                                const at::Tensor& lengths1,
-                                                const at::Tensor& lengths2, int K, float radius) {
+at::Tensor BallQueryCpu(const at::Tensor& p1, const at::Tensor& p2, const at::Tensor& lengths1,
+                        const at::Tensor& lengths2, int K, float radius) {
   const int N = p1.size(0);
   const int P1 = p1.size(1);
   const int D = p1.size(2);
 
   auto long_opts = lengths1.options().dtype(torch::kInt64);
   torch::Tensor idxs = torch::full({N, P1, K}, -1, long_opts);
-  torch::Tensor dists = torch::full({N, P1, K}, 0, p1.options());
   const float radius2 = radius * radius;
 
   auto p1_a = p1.accessor<float, 3>();
@@ -28,7 +26,6 @@ std::tuple<at::Tensor, at::Tensor> BallQueryCpu(const at::Tensor& p1, const at::
   auto lengths1_a = lengths1.accessor<int64_t, 1>();
   auto lengths2_a = lengths2.accessor<int64_t, 1>();
   auto idxs_a = idxs.accessor<int64_t, 3>();
-  auto dists_a = dists.accessor<float, 3>();
 
   for (int n = 0; n < N; ++n) {
     const int64_t length1 = lengths1_a[n];
@@ -41,12 +38,11 @@ std::tuple<at::Tensor, at::Tensor> BallQueryCpu(const at::Tensor& p1, const at::
           dist2 += diff * diff;
         }
         if (dist2 < radius2) {
-          dists_a[n][i][count] = dist2;
           idxs_a[n][i][count] = j;
           ++count;
         }
       }
     }
   }
-  return std::make_tuple(idxs, dists);
+  return idxs;
 }

@@ -3,9 +3,7 @@
 #
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
-
-from collections import namedtuple
-from typing import Optional
+from typing import NamedTuple, Optional
 
 import torch
 from torch.autograd import Function
@@ -13,7 +11,11 @@ from torch.autograd.function import once_differentiable
 
 from pointdet import _C
 
-_KNN = namedtuple("KNN", "dists idx knn")
+
+class KNNRet(NamedTuple):
+    dists: torch.Tensor
+    idx: torch.Tensor
+    knn: Optional[torch.Tensor] = None
 
 
 class _knn_points(Function):
@@ -117,7 +119,7 @@ def knn_points(
     version: int = -1,
     return_nn: bool = False,
     return_sorted: bool = True,
-) -> _KNN:
+) -> KNNRet:
     """
     K-Nearest neighbors on point clouds.
 
@@ -191,7 +193,7 @@ def knn_points(
     if return_nn:
         p2_nn = knn_gather(p2, p1_idx, lengths2)
 
-    return _KNN(dists=p1_dists, idx=p1_idx, knn=p2_nn if return_nn else None)
+    return KNNRet(dists=p1_dists, idx=p1_idx, knn=p2_nn if return_nn else None)
 
 
 def knn_gather(x: torch.Tensor, idx: torch.Tensor, lengths: Optional[torch.Tensor] = None):

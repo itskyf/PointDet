@@ -12,9 +12,6 @@ from torch.autograd.function import once_differentiable
 
 from pointdet import _C
 
-from .knn import _KNN
-from .utils import masked_gather
-
 
 class _ball_query(Function):
     """
@@ -22,41 +19,35 @@ class _ball_query(Function):
     """
 
     @staticmethod
-    def forward(ctx, p1, p2, lengths1, lengths2, K, radius):
+    def forward(
+        ctx,
+        centers: torch.Tensor,
+        points: torch.Tensor,
+        num_samples: int,
+        radius: float,
+        lengths1: torch.Tensor,
+        lengths2: torch.Tensor,
+    ):
         """
         Arguments defintions the same as in the ball_query function
         """
-        idx, dists = _C.ball_query(p1, p2, lengths1, lengths2, K, radius)
-        ctx.save_for_backward(p1, p2, lengths1, lengths2, idx)
+        idx = _C.ball_query(centers, points, lengths1, lengths2, num_samples, radius)
         ctx.mark_non_differentiable(idx)
-        return dists, idx
+        return idx
 
     @staticmethod
     @once_differentiable
-    def backward(ctx, grad_dists, grad_idx):
-        p1, p2, lengths1, lengths2, idx = ctx.saved_tensors
-        # TODO(gkioxari) Change cast to floats once we add support for doubles.
-        if grad_dists.dtype != torch.float32:
-            grad_dists = grad_dists.float()
-        if p1.dtype != torch.float32:
-            p1 = p1.float()
-        if p2.dtype != torch.float32:
-            p2 = p2.float()
-
-        # Reuse the KNN backward function
-        # by default, norm is 2
-        grad_p1, grad_p2 = _C.knn_points_backward(p1, p2, lengths1, lengths2, idx, 2, grad_dists)
-        return grad_p1, grad_p2, None, None, None, None
+    def backward(ctx, grad_idx):
+        return None, None, None, None
 
 
 def ball_query(
-    p1: torch.Tensor,
-    p2: torch.Tensor,
+    centers: torch.Tensor,
+    points: torch.Tensor,
+    num_samples: int = 500,
+    radius: float = 0.2,
     lengths1: Optional[torch.Tensor] = None,
     lengths2: Optional[torch.Tensor] = None,
-    K: int = 500,
-    radius: float = 0.2,
-    return_nn: bool = True,
 ):
     """
     Ball Query is an alternative to KNN. It can be
@@ -80,21 +71,16 @@ def ball_query(
         on Point Sets in a Metric Space", NeurIPS 2017.
 
     Args:
-        p1: Tensor of shape (N, P1, D) giving a batch of N point clouds, each
-            containing up to P1 points of dimension D. These represent the centers of
-            the ball queries.
-        p2: Tensor of shape (N, P2, D) giving a batch of N point clouds, each
-            containing up to P2 points of dimension D.
-        lengths1: LongTensor of shape (N,) of values in the range [0, P1], giving the
-            length of each pointcloud in p1. Or None to indicate that every cloud has
-            length P1.
-        lengths2: LongTensor of shape (N,) of values in the range [0, P2], giving the
-            length of each pointcloud in p2. Or None to indicate that every cloud has
-            length P2.
-        K: Integer giving the upper bound on the number of samples to take
-            within the radius
+        p1: Tensor of shape (N, P1, D) giving a batch of N point clouds, each containing
+            up to P1 points of dimension D. These represent the centers of the ball queries.
+        p2: Tensor of shape (N, P2, D) giving a batch of N point clouds, each containing
+            up to P2 points of dimension D.
+        num_samples: upper bound on the number of samples to take within the radius
         radius: the radius around each point within which the neighbors need to be located
-        return_nn: If set to True returns the K neighbor points in p2 for each point in p1.
+        lengths1: LongTensor of shape (N,) of values in the range [0, P1], giving the length
+            of each pointcloud in p1. Or None to indicate that every cloud has length P1.
+        lengths2: LongTensor of shape (N,) of values in the range [0, P2], giving the length
+            of each pointcloud in p2. Or None to indicate that every cloud has length P2.
 
     Returns:
         dists: Tensor of shape (N, P1, K) giving the squared distances to
@@ -102,39 +88,27 @@ def ball_query(
             has fewer than S points and where a cloud in p1 has fewer than P1 points
             and also if there are fewer than K points which satisfy the radius threshold.
 
-        idx: LongTensor of shape (N, P1, K) giving the indices of the
-            S neighbors in p2 for points in p1.
+        idx: LongTensor (N, P1, K) giving the indices of the S neighbors in p2 for points in p1.
             Concretely, if `p1_idx[n, i, k] = j` then `p2[n, j]` is the k-th
             neighbor to `p1[n, i]` in `p2[n]`. This is padded with -1 both where a cloud
-            in p2 has fewer than S points and where a cloud in p1 has fewer than P1
-            points and also if there are fewer than K points which satisfy the radius threshold.
-
-        nn: Tensor of shape (N, P1, K, D) giving the K neighbors in p2 for
-            each point in p1. Concretely, `p2_nn[n, i, k]` gives the k-th neighbor
-            for `p1[n, i]`. Returned if `return_nn` is True.  The output is a tensor
-            of shape (N, P1, K, U).
-
+            in p2 has fewer than S points and where a cloud in p1 has fewer than P1 points
+            and also if there are fewer than K points which satisfy the radius threshold.
     """
-    if p1.size(0) != p2.size(0):
+    if centers.size(0) != points.size(0):
         raise ValueError("pts1 and pts2 must have the same batch dimension")
-    if p1.size(2) != p2.size(2):
+    if centers.size(2) != points.size(2):
         raise ValueError("pts1 and pts2 must have the same point dimension")
 
-    p1 = p1.contiguous()
-    p2 = p2.contiguous()
-    P1 = p1.size(1)
-    P2 = p2.size(1)
-    N = p1.size(0)
+    num_centers = centers.size(1)
+    num_points = points.size(1)
+    N = centers.size(0)
 
+    device = centers.device
     if lengths1 is None:
-        lengths1 = torch.full((N,), P1, dtype=torch.int64, device=p1.device)
+        lengths1 = torch.full((N,), num_centers, dtype=torch.int64, device=device)
     if lengths2 is None:
-        lengths2 = torch.full((N,), P2, dtype=torch.int64, device=p1.device)
+        lengths2 = torch.full((N,), num_points, dtype=torch.int64, device=device)
 
     # pyre-fixme[16]: `_ball_query` has no attribute `apply`.
-    dists, idx = _ball_query.apply(p1, p2, lengths1, lengths2, K, radius)
-
-    # Gather the neighbors if needed
-    points_nn = masked_gather(p2, idx) if return_nn else None
-
-    return _KNN(dists=dists, idx=idx, knn=points_nn)
+    idx = _ball_query.apply(centers, points, num_samples, radius, lengths1, lengths2)
+    return idx

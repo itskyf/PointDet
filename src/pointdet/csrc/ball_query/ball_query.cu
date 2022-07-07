@@ -24,8 +24,7 @@ __global__ void BallQueryKernel(
     const at::PackedTensorAccessor64<scalar_t, 3, at::RestrictPtrTraits> p2,
     const at::PackedTensorAccessor64<int64_t, 1, at::RestrictPtrTraits> lengths1,
     const at::PackedTensorAccessor64<int64_t, 1, at::RestrictPtrTraits> lengths2,
-    at::PackedTensorAccessor64<int64_t, 3, at::RestrictPtrTraits> idxs,
-    at::PackedTensorAccessor64<scalar_t, 3, at::RestrictPtrTraits> dists, const int64_t K,
+    at::PackedTensorAccessor64<int64_t, 3, at::RestrictPtrTraits> idxs, const int64_t K,
     const float radius2) {
   const int64_t N = p1.size(0);
   const int64_t chunks_per_cloud = (1 + (p1.size(1) - 1) / blockDim.x);
@@ -56,8 +55,6 @@ __global__ void BallQueryKernel(
         // If the point is within the radius
         // Set the value of the index to the point index
         idxs[n][i][count] = j;
-        dists[n][i][count] = dist2;
-
         // increment the number of selected samples for the point i
         ++count;
       }
@@ -65,11 +62,11 @@ __global__ void BallQueryKernel(
   }
 }
 
-std::tuple<at::Tensor, at::Tensor> BallQueryCuda(const at::Tensor& p1,        // (N, P1, 3)
-                                                 const at::Tensor& p2,        // (N, P2, 3)
-                                                 const at::Tensor& lengths1,  // (N,)
-                                                 const at::Tensor& lengths2,  // (N,)
-                                                 int K, float radius) {
+at::Tensor BallQueryCuda(const at::Tensor& p1,        // (N, P1, 3)
+                         const at::Tensor& p2,        // (N, P2, 3)
+                         const at::Tensor& lengths1,  // (N,)
+                         const at::Tensor& lengths2,  // (N,)
+                         int K, float radius) {
   // Check inputs are on the same device
   at::TensorArg p1_t{p1, "p1", 1}, p2_t{p2, "p2", 2}, lengths1_t{lengths1, "lengths1", 3},
       lengths2_t{lengths2, "lengths2", 4};
@@ -91,15 +88,14 @@ std::tuple<at::Tensor, at::Tensor> BallQueryCuda(const at::Tensor& p1,        //
   // Output tensor with indices of neighbors for each point in p1
   auto long_dtype = lengths1.options().dtype(at::kLong);
   auto idxs = at::full({N, P1, K}, -1, long_dtype);
-  auto dists = at::zeros({N, P1, K}, p1.options());
 
   if (idxs.numel() == 0) {
     AT_CUDA_CHECK(cudaGetLastError());
-    return std::make_tuple(idxs, dists);
+    return idxs;
   }
 
-  const size_t blocks = 256;
-  const size_t threads = 256;
+  constexpr size_t blocks = 256;
+  constexpr size_t threads = 256;
 
   AT_DISPATCH_FLOATING_TYPES(p1.scalar_type(), "ball_query_kernel_cuda", ([&] {
                                BallQueryKernel<<<blocks, threads, 0, stream>>>(
@@ -108,11 +104,8 @@ std::tuple<at::Tensor, at::Tensor> BallQueryCuda(const at::Tensor& p1,        //
                                    lengths1.packed_accessor64<int64_t, 1, at::RestrictPtrTraits>(),
                                    lengths2.packed_accessor64<int64_t, 1, at::RestrictPtrTraits>(),
                                    idxs.packed_accessor64<int64_t, 3, at::RestrictPtrTraits>(),
-                                   dists.packed_accessor64<float, 3, at::RestrictPtrTraits>(), K_64,
-                                   radius2);
+                                   K_64, radius2);
                              }));
-
   AT_CUDA_CHECK(cudaGetLastError());
-
-  return std::make_tuple(idxs, dists);
+  return idxs;
 }

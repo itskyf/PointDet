@@ -11,7 +11,7 @@
 
 #include <tuple>
 
-#include "utils/pytorch3d_cutils.h"
+#include "utils/cuda_utils.hpp"
 
 // Iterative farthest point sampling algorithm [1] to subsample a set of
 // K points from a given pointcloud. At each iteration, a point is selected
@@ -58,7 +58,7 @@ at::Tensor FarthestPointSampling(const at::Tensor& points, const at::Tensor& len
     CHECK_CUDA(start_idxs);
     return FarthestPointSamplingCuda(points, lengths, K, start_idxs);
 #else
-    AT_ERROR("Not compiled with GPU support.");
+    AT_ERROR("Not compiled with GPU support");
 #endif
   }
   return FarthestPointSamplingCpu(points, lengths, K, start_idxs);

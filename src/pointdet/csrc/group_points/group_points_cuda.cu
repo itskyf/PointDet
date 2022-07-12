@@ -1,6 +1,6 @@
 #include <ATen/ATen.h>
 #include <ATen/cuda/Atomic.cuh>
-#include <ATen/cuda/CUDAContext.h>
+#include <ATen/cuda/Exceptions.h>
 #include <c10/cuda/CUDAGuard.h>
 
 #include "utils/cuda_utils.hpp"
@@ -40,7 +40,7 @@ at::Tensor GroupPointsCuda(const at::Tensor points, const at::Tensor indices, co
 
   // blockIdx.x(col), blockIdx.y(row)
   dim3 blocks(GetBlockSize(num_groups * num_neighbors), feat_dims, batch_size);
-  dim3 threads(THREADS_PER_BLOCK);
+  dim3 threads(kThreadsPerBlock);
   auto output = at::empty({batch_size, feat_dims, num_groups, num_neighbors}, points.options());
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(points.scalar_type(), "group_points_kernel", [&] {
@@ -90,7 +90,7 @@ at::Tensor GroupPointsBackwardCuda(const at::Tensor grad_out, const at::Tensor i
 
   // blockIdx.x(col), blockIdx.y(row)
   dim3 blocks(GetBlockSize(num_groups * num_neighbors), feat_dims, batch_size);
-  dim3 threads(THREADS_PER_BLOCK);
+  dim3 threads(kThreadsPerBlock);
   auto grad_points = at::zeros({batch_size, feat_dims, num_feats}, grad_out.options());
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(grad_out.scalar_type(), "group_points_backward_kernel", [&] {

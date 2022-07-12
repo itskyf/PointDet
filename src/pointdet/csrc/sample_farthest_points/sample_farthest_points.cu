@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 #include <ATen/ATen.h>
-#include <ATen/cuda/CUDAContext.h>
+#include <ATen/cuda/Exceptions.h>
 #include <c10/cuda/CUDAGuard.h>
 
 #include "utils/warp_reduce.cuh"

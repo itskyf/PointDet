@@ -21,8 +21,8 @@ std::tuple<at::Tensor, at::Tensor> KNearestNeighborIdxCpu(const at::Tensor& p1,
   const int D = p1.size(2);
 
   auto long_opts = lengths1.options().dtype(at::kLong);
-  auto idxs = at::full({N, P1, K}, 0, long_opts);
-  auto dists = at::full({N, P1, K}, 0, p1.options());
+  auto idxs = at::zeros({N, P1, K}, long_opts);
+  auto dists = at::zeros({N, P1, K}, p1.options());
 
   auto p1_a = p1.accessor<float, 3>();
   auto p2_a = p2.accessor<float, 3>();
@@ -81,8 +81,8 @@ std::tuple<at::Tensor, at::Tensor> KNearestNeighborBackwardCpu(
   const int P2 = p2.size(1);
   const int K = idxs.size(2);
 
-  auto grad_p1 = torch::full({N, P1, D}, 0, p1.options());
-  auto grad_p2 = torch::full({N, P2, D}, 0, p2.options());
+  auto grad_p1 = at::full({N, P1, D}, 0, p1.options());
+  auto grad_p2 = at::full({N, P2, D}, 0, p2.options());
 
   auto p1_a = p1.accessor<float, 3>();
   auto p2_a = p2.accessor<float, 3>();

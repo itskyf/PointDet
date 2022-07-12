@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 #include <ATen/ATen.h>
-#include <ATen/cuda/CUDAContext.h>
+#include <ATen/cuda/Exceptions.h>
 #include <c10/cuda/CUDAGuard.h>
 
 #include <iostream>
@@ -243,7 +243,7 @@ bool InBounds(const int64_t min, const int64_t x, const int64_t max) {
 bool KnnCheckVersion(int version, const int64_t D, const int64_t K) {
   switch (version) {
     case 0:
-      return True;
+      return true;
     case 1:
       return InBounds(V1_MIN_D, D, V1_MAX_D);
     case 2:
@@ -384,7 +384,7 @@ __global__ void KNearestNeighborBackwardKernel(const float* __restrict__ p1,    
       // index of point in p2 corresponding to the k-th nearest neighbor
       const size_t p2_idx = idxs[n * P1 * K + p1_idx * K + k];
       // If the index is the pad value of -1 then ignore it
-      if (p2_idx == -1) {
+      if (p2_idx == static_cast<size_t>(-1)) {
         continue;
       }
       float diff = 0.0;

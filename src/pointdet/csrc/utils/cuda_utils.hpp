@@ -17,8 +17,8 @@
   CHECK_CUDA(x);                 \
   CHECK_CONTIGUOUS(x)
 
-constexpr int THREADS_PER_BLOCK = 512;
-inline int GetBlockSize(const int n, const int num_threads = THREADS_PER_BLOCK) {
+constexpr int kThreadsPerBlock = 512;
+inline int GetBlockSize(const int n, const int num_threads = kThreadsPerBlock) {
   const int optimal_block_num = (n + num_threads - 1) / num_threads;
   constexpr int max_block_num = 4096;
   return std::min(optimal_block_num, max_block_num);

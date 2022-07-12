@@ -95,8 +95,8 @@ def ball_query(
 
     device = centroids.device
     if lengths1 is None:
-        lengths1 = torch.full((batch_size,), num_centers, dtype=torch.int64, device=device)
+        lengths1 = torch.full((batch_size,), num_centers, dtype=torch.int, device=device)
     if lengths2 is None:
-        lengths2 = torch.full((batch_size,), total_points, dtype=torch.int64, device=device)
+        lengths2 = torch.full((batch_size,), total_points, dtype=torch.int, device=device)
 
     return _ball_query.apply(centroids, points, num_neighbors, radius, lengths1, lengths2)

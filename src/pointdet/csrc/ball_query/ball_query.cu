@@ -21,19 +21,19 @@ template <typename scalar_t>
 __global__ void BallQueryKernel(
     const at::PackedTensorAccessor64<scalar_t, 3, at::RestrictPtrTraits> p1,
     const at::PackedTensorAccessor64<scalar_t, 3, at::RestrictPtrTraits> p2,
-    const at::PackedTensorAccessor64<int64_t, 1, at::RestrictPtrTraits> lengths1,
-    const at::PackedTensorAccessor64<int64_t, 1, at::RestrictPtrTraits> lengths2,
-    at::PackedTensorAccessor32<int32_t, 3, at::RestrictPtrTraits> idxs, const int64_t K,
+    const at::PackedTensorAccessor32<int32_t, 1, at::RestrictPtrTraits> lengths1,
+    const at::PackedTensorAccessor32<int32_t, 1, at::RestrictPtrTraits> lengths2,
+    at::PackedTensorAccessor32<int32_t, 3, at::RestrictPtrTraits> idxs, const int K,
     const float radius2) {
-  const int64_t N = p1.size(0);
-  const int64_t chunks_per_cloud = (1 + (p1.size(1) - 1) / blockDim.x);
-  const int64_t chunks_to_do = N * chunks_per_cloud;
+  const int N = p1.size(0);
+  const int chunks_per_cloud = (1 + (p1.size(1) - 1) / blockDim.x);
+  const int chunks_to_do = N * chunks_per_cloud;
   const int D = p1.size(2);
 
-  for (int64_t chunk = blockIdx.x; chunk < chunks_to_do; chunk += gridDim.x) {
-    const int64_t n = chunk / chunks_per_cloud;  // batch_index
-    const int64_t start_point = blockDim.x * (chunk % chunks_per_cloud);
-    int64_t i = start_point + threadIdx.x;
+  for (int chunk = blockIdx.x; chunk < chunks_to_do; chunk += gridDim.x) {
+    const int n = chunk / chunks_per_cloud;  // batch_index
+    const int start_point = blockDim.x * (chunk % chunks_per_cloud);
+    int i = start_point + threadIdx.x;
 
     // Check if point is valid in heterogeneous tensor
     if (i >= lengths1[n]) {
@@ -42,7 +42,7 @@ __global__ void BallQueryKernel(
 
     // Iterate over points in p2 until desired count is reached or
     // all points have been considered
-    for (int64_t j = 0, count = 0; j < lengths2[n] && count < K; ++j) {
+    for (int j = 0, count = 0; j < lengths2[n] && count < K; ++j) {
       // Calculate the distance between the points
       scalar_t dist2 = 0.0;
       for (int d = 0; d < D; ++d) {
@@ -81,11 +81,10 @@ at::Tensor BallQueryCuda(const at::Tensor& p1,        // (N, P1, 3)
 
   const int N = p1.size(0);
   const int P1 = p1.size(1);
-  const int64_t K_64 = K;
   const float radius2 = radius * radius;
 
   // Output tensor with indices of neighbors for each point in p1
-  auto int_dtype = lengths1.options().dtype(at::kInt);
+  auto int_dtype = p1.options().dtype(at::kInt);
   auto idxs = at::full({N, P1, K}, -1, int_dtype);
 
   if (idxs.numel() == 0) {
@@ -99,9 +98,9 @@ at::Tensor BallQueryCuda(const at::Tensor& p1,        // (N, P1, 3)
     BallQueryKernel<<<blocks, threads, 0, stream>>>(
         p1.packed_accessor64<float, 3, at::RestrictPtrTraits>(),
         p2.packed_accessor64<float, 3, at::RestrictPtrTraits>(),
-        lengths1.packed_accessor64<int64_t, 1, at::RestrictPtrTraits>(),
-        lengths2.packed_accessor64<int64_t, 1, at::RestrictPtrTraits>(),
-        idxs.packed_accessor32<int32_t, 3, at::RestrictPtrTraits>(), K_64, radius2);
+        lengths1.packed_accessor32<int32_t, 1, at::RestrictPtrTraits>(),
+        lengths2.packed_accessor32<int32_t, 1, at::RestrictPtrTraits>(),
+        idxs.packed_accessor32<int32_t, 3, at::RestrictPtrTraits>(), K, radius2);
   });
   AT_CUDA_CHECK(cudaGetLastError());
   return idxs;

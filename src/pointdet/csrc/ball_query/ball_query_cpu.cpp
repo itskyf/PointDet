@@ -22,13 +22,13 @@ at::Tensor BallQueryCpu(const at::Tensor& p1, const at::Tensor& p2, const at::Te
 
   auto p1_a = p1.accessor<float, 3>();
   auto p2_a = p2.accessor<float, 3>();
-  auto lengths1_a = lengths1.accessor<int64_t, 1>();
-  auto lengths2_a = lengths2.accessor<int64_t, 1>();
+  auto lengths1_a = lengths1.accessor<int32_t, 1>();
+  auto lengths2_a = lengths2.accessor<int32_t, 1>();
   auto idxs_a = idxs.accessor<int32_t, 3>();
 
   for (int n = 0; n < N; ++n) {
-    const int64_t length1 = lengths1_a[n];
-    const int64_t length2 = lengths2_a[n];
+    const int32_t length1 = lengths1_a[n];
+    const int32_t length2 = lengths2_a[n];
     for (int64_t i = 0; i < length1; ++i) {
       for (int64_t j = 0, count = 0; j < length2 && count < K; ++j) {
         float dist2 = 0;

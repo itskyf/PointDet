@@ -13,15 +13,12 @@
 
 template <unsigned int block_size>
 __global__ void FarthestPointSamplingKernel(
-    // clang-format off
     const at::PackedTensorAccessor64<float, 3, at::RestrictPtrTraits> points,
     const at::PackedTensorAccessor64<int64_t, 1, at::RestrictPtrTraits> lengths,
     const at::PackedTensorAccessor64<int64_t, 1, at::RestrictPtrTraits> K,
     at::PackedTensorAccessor64<int64_t, 2, at::RestrictPtrTraits> idxs,
     at::PackedTensorAccessor64<float, 2, at::RestrictPtrTraits> min_point_dist,
-    const at::PackedTensorAccessor64<int64_t, 1, at::RestrictPtrTraits> start_idxs
-    // clang-format on
-) {
+    const at::PackedTensorAccessor64<int64_t, 1, at::RestrictPtrTraits> start_idxs) {
   // Get constants
   const int64_t N = points.size(0);
   const int64_t P = points.size(1);

@@ -59,7 +59,6 @@ def sample_farthest_points(
     """
     batch_size, total_points = points.shape[:2]
     device = points.device
-
     # Validate inputs
     if lengths is None:
         lengths = torch.full((batch_size,), total_points, dtype=torch.int64, device=device)
@@ -85,7 +84,6 @@ def sample_farthest_points(
             start_idxs[b_idx] = torch.randint(high=lengths[b_idx], size=(1,)).item()
 
     with torch.no_grad():
-        # pyre-fixme[16]: `pytorch3d_._C` has no attribute `sample_farthest_points`.
         indices = _C.sample_farthest_points(points, lengths, num_points, start_idxs)
     return indices
 

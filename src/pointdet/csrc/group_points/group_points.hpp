@@ -18,8 +18,8 @@ inline at::Tensor GroupPoints(const at::Tensor points, const at::Tensor indices)
 #ifdef WITH_CUDA
     CHECK_CUDA(points);
     CHECK_CUDA(indices);
-    return GroupPointsCuda(points.contiguous(), indices.contiguous(), batch_size, feat_dims,
-                           num_feats, num_groups, num_neighbors);
+    return GroupPointsCuda(points, indices, batch_size, feat_dims, num_feats, num_groups,
+                           num_neighbors);
 #endif
   }
   AT_ERROR("Not compiled with GPU support");
@@ -37,8 +37,8 @@ inline at::Tensor GroupPointsBackward(const at::Tensor grad_out, const at::Tenso
 #ifdef WITH_CUDA
     CHECK_CUDA(grad_out);
     CHECK_CUDA(indices);
-    return GroupPointsBackwardCuda(grad_out.contiguous(), indices.contiguous(), batch_size,
-                                   feat_dims, num_feats, num_groups, num_neighbors);
+    return GroupPointsBackwardCuda(grad_out, indices, batch_size, feat_dims, num_feats, num_groups,
+                                   num_neighbors);
 #endif
   }
   AT_ERROR("Not compiled with GPU support");

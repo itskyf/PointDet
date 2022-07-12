@@ -58,12 +58,10 @@ inline at::Tensor BallQuery(const at::Tensor& centers, const at::Tensor& points,
 #ifdef WITH_CUDA
     CHECK_CUDA(centers);
     CHECK_CUDA(points);
-    return BallQueryCuda(centers, points, lengths1.contiguous(), lengths2.contiguous(), num_samples,
-                         radius);
+    return BallQueryCuda(centers, points, lengths1, lengths2, num_samples, radius);
 #else
     AT_ERROR("Not compiled with GPU support");
 #endif
   }
-  return BallQueryCpu(centers, points, lengths1.contiguous(), lengths2.contiguous(), num_samples,
-                      radius);
+  return BallQueryCpu(centers, points, lengths1, lengths2, num_samples, radius);
 }

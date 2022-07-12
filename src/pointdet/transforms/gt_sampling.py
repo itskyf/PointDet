@@ -263,14 +263,8 @@ class DBSampler:
 
 class GTSampler:
     """Sample GT objects to the data.
-
     Args:
         db_sampler (dict): Config dict of the database sampler.
-        sample_2d (bool): Whether to also paste 2D image patch to the images
-            This should be true when applying multi-modality cut-and-paste.
-            Defaults to False.
-        use_ground_plane (bool): Whether to use gound plane to adjust the
-            3D labels.
     """
 
     def __init__(self, db_sampler: DBSampler):

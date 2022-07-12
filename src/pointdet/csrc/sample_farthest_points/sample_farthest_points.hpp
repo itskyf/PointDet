@@ -49,7 +49,7 @@ at::Tensor FarthestPointSamplingCpu(const at::Tensor& points, const at::Tensor& 
 
 // Exposed implementation.
 inline at::Tensor FarthestPointSampling(const at::Tensor& points, const at::Tensor& lengths,
-                                 const at::Tensor& K, const at::Tensor& start_idxs) {
+                                        const at::Tensor& K, const at::Tensor& start_idxs) {
   if (points.is_cuda() || lengths.is_cuda() || K.is_cuda()) {
 #ifdef WITH_CUDA
     CHECK_CUDA(points);

@@ -68,9 +68,6 @@ class _knn_points(Function):
                 neighbors to `p1[n, i]` in `p2[n]`. This is padded with zeros both where a cloud
                 in p2 has fewer than K points and where a cloud in p1 has fewer than P1 points.
         """
-        if norm not in (1, 2):
-            raise ValueError("Support for 1 or 2 norm")
-
         idx, dists = _C.knn_points_idx(p1, p2, lengths1, lengths2, norm, K, version)
 
         # sort KNN in ascending order if K > 1
@@ -168,14 +165,6 @@ def knn_points(
             of shape (N, P1, K, U).
 
     """
-    if p1.size(0) != p2.size(0):
-        raise ValueError("pts1 and pts2 must have the same batch dimension")
-    if p1.size(2) != p2.size(2):
-        raise ValueError("pts1 and pts2 must have the same point dimension")
-
-    p1 = p1.contiguous()
-    p2 = p2.contiguous()
-
     P1 = p1.size(1)
     P2 = p2.size(1)
 

@@ -89,11 +89,6 @@ def ball_query(
             in p2 has fewer than S points and where a cloud in p1 has fewer than P1 points
             and also if there are fewer than K points which satisfy the radius threshold.
     """
-    if centroids.size(0) != points.size(0):
-        raise ValueError("centroids and points must have the same batch dimension")
-    if centroids.size(2) != points.size(2):
-        raise ValueError("centroids and points must have the same point dimension")
-
     num_centers = centroids.size(1)
     total_points = points.size(1)
     batch_size = centroids.size(0)

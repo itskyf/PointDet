@@ -72,7 +72,8 @@ at::Tensor BallQueryCuda(const at::Tensor& p1,        // (N, P1, 3)
   at::CheckedFrom c = "BallQueryCuda";
   at::checkAllSameGPU(c, {p1_t, p2_t, lengths1_t, lengths2_t});
   at::checkAllSameType(c, {p1_t, p2_t});
-  TORCH_CHECK(p2.size(2) == p1.size(2), "Point sets must have the same last dimension");
+  TORCH_CHECK(p1.size(0) == p2.size(0), "Point sets must have the same batch dimension");
+  TORCH_CHECK(p1.size(2) == p2.size(2), "Point sets must have the same last dimension");
 
   // Set the device for the kernel launch based on the device of p1
   at::cuda::CUDAGuard device_guard(p1.device());

@@ -284,9 +284,8 @@ std::tuple<at::Tensor, at::Tensor> KNearestNeighborIdxCuda(
   const auto D = p2.size(2);
   const int64_t K_64 = K;
 
-  TORCH_CHECK((norm == 1) || (norm == 2), "Norm must be 1 or 2");
-
-  TORCH_CHECK(p2.size(2) == D, "Point sets must have the same last dimension");
+  TORCH_CHECK(norm == 1 || norm == 2, "Norm must be 1 or 2");
+  TORCH_CHECK(p1.size(2) == D, "Point sets must have the same last dimension");
   auto long_dtype = lengths1.options().dtype(at::kLong);
   auto idxs = at::zeros({N, P1, K}, long_dtype);
   auto dists = at::zeros({N, P1, K}, p1.options());
@@ -424,6 +423,7 @@ std::tuple<at::Tensor, at::Tensor> KNearestNeighborBackwardCuda(
   const auto D = p2.size(2);
   const auto K = idxs.size(2);
 
+  TORCH_CHECK(N == p2.size(0), "Point sets must have the same batch dimension");
   TORCH_CHECK(p1.size(2) == D, "Point sets must have the same last dimension");
   TORCH_CHECK(idxs.size(0) == N, "KNN idxs must have the same batch dimension");
   TORCH_CHECK(idxs.size(1) == P1, "KNN idxs must have the same point dimension as p1");

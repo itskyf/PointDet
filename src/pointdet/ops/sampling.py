@@ -63,16 +63,11 @@ def sample_farthest_points(
     # Validate inputs
     if lengths is None:
         lengths = torch.full((batch_size,), total_points, dtype=torch.int64, device=device)
-    if lengths.shape != (batch_size,):
-        raise ValueError("points and lengths must have same batch dimension.")
     # TODO: support providing K as a ratio of the total number of points instead of as an int
     if isinstance(num_points, int):
         num_points = torch.full((batch_size,), num_points, dtype=torch.int64, device=device)
     elif isinstance(num_points, list):
         num_points = torch.tensor(num_points, dtype=torch.int64, device=device)
-
-    if num_points.size(0) != batch_size:
-        raise ValueError("K and points must have the same batch dimension")
 
     # Check dtypes are correct and convert if necessary
     if points.dtype != torch.float32:

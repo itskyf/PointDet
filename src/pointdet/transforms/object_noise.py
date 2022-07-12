@@ -27,7 +27,7 @@ class ObjectNoise:
         self,
         translation_std: tuple[float, float, float] = (0.25, 0.25, 0.25),
         global_rot_range: tuple[float, float] = (0.0, 0.0),
-        rot_range: tuple[float, float] = (-0.15707963267, 0.15707963267),
+        rot_range: tuple[float, float] = (-np.pi / 20, np.pi / 20),
         num_try: int = 100,
         seed: Optional[int] = None,
     ):

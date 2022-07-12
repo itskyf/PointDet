@@ -5,6 +5,7 @@ from .transforms import (
     GlobalRotScaleTrans,
     ObjectRangeFilter,
     PointsRangeFilter,
+    PointsSample,
     PointsShuffle,
     RandomFlip3D,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "GlobalRotScaleTrans",
     "ObjectRangeFilter",
     "PointsRangeFilter",
+    "PointsSample",
     "PointsShuffle",
     "RandomFlip3D",
 ]

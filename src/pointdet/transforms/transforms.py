@@ -74,7 +74,7 @@ class GlobalRotScaleTrans:
         noise_rotation = np.random.uniform(self.rot_range[0], self.rot_range[1])
         pcd.gt_bboxes_3d.rotate(noise_rotation)
         pcd.points.rotate(noise_rotation)
-        # TODO medium this function is different with mmdet3d's
+        # TODO this function is different with mmdet3d's
         # mmdet3d's version rotate points using matrix returned after rotate gt_boxes_3d
 
     def _scale_bbox_points(self, pcd: PointCloud):
@@ -177,6 +177,67 @@ class PointsRangeFilter:
         y_mask = (tensor[:, 1] > self.pcd_range[1]) & (tensor[:, 1] < self.pcd_range[4])
         z_mask = (tensor[:, 2] > self.pcd_range[2]) & (tensor[:, 2] < self.pcd_range[5])
         pcd.points = pcd.points.new_points(tensor[x_mask & y_mask & z_mask])
+        return pcd
+
+
+class PointsSample:
+    """Point sample.
+
+    Sampling data to a certain number.
+
+    Args:
+        num_points (int): Number of points to be sampled.
+        sample_range (float, optional): The range where to sample points.
+            If not None, the points with depth larger than `sample_range` are
+            prior to be sampled. Defaults to None.
+        replace (bool, optional): Whether the sampling is with or without
+            replacement. Defaults to False.
+    """
+
+    def __init__(self, num_points: int, seed: Optional[int] = None):
+        self.num_samples = num_points
+        self.rng = np.random.default_rng(seed)
+
+    def _points_random_sampling(self, points, num_samples):
+        """Points random sampling.
+
+        Sample points to a certain number.
+
+        Args:
+            points (np.ndarray | :obj:`BasePoints`): 3D Points.
+            num_samples (int): Number of samples to be sampled.
+            sample_range (float, optional): Indicating the range where the
+                points will be sampled. Defaults to None.
+            replace (bool, optional): Sampling with or without replacement.
+                Defaults to None.
+            return_choices (bool, optional): Whether return choice.
+                Defaults to False.
+        Returns:
+            tuple[np.ndarray] | np.ndarray:
+                - points (np.ndarray | :obj:`BasePoints`): 3D Points.
+                - choices (np.ndarray, optional): The generated random samples.
+        """
+        if not replace:
+            replace = points.shape[0] < num_samples
+        point_range = range(len(points))
+        choices = np.random.choice(point_range, num_samples, replace=replace)
+        return points[choices]
+
+    def __call__(self, pcd: PointCloud) -> PointCloud:
+        """Call function to sample points to in indoor scenes.
+
+        Args:
+            input_dict (dict): Result dict from loading pipeline.
+        Returns:
+            dict: Results after sampling, 'points', 'pts_instance_mask'
+                and 'pts_semantic_mask' keys are updated in the result dict.
+        """
+        tensor = pcd.points.tensor
+        num_points = tensor.size(0)
+        choices = self.rng.choice(
+            range(num_points), self.num_samples, replace=num_points < self.num_samples
+        )
+        pcd.points = pcd.points.new_points(tensor[choices])
         return pcd
 
 

@@ -29,9 +29,9 @@ __device__ inline bool check_pt_in_box3d(const T *pt, const T *box3d, T &local_x
 }
 
 template <typename T>
-__global__ void points_in_boxes_part_kernel(const T *boxes, const T *pts,
-                                            int64_t *box_idx_of_points, const int batch_size,
-                                            const int num_boxes, const int num_points) {
+__global__ void points_in_boxes_part_kernel(const T *boxes, const T *pts, int *box_idx_of_points,
+                                            const int batch_size, const int num_boxes,
+                                            const int num_points) {
   // params boxes: (B, N, 7) [x, y, z, x_size, y_size, z_size, rz] in LiDAR
   // coordinate, z is the bottom center, each box DO NOT overlaps params pts:
   // (B, npoints, 3) [x, y, z] in LiDAR coordinate params boxes_idx_of_points:
@@ -67,15 +67,15 @@ at::Tensor PointsInBoxesPartCuda(const at::Tensor &boxes, const at::Tensor &poin
   at::cuda::CUDAGuard device_guard(boxes.device());
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
 
-  auto long_opts = points.options().dtype(at::kLong);
-  auto box_idx_of_points = at::full({batch_size, num_points}, -1, long_opts);
+  auto int_opts = points.options().dtype(at::kInt);
+  auto box_idx_of_points = at::full({batch_size, num_points}, -1, int_opts);
 
   dim3 blocks(GetBlockSize(num_points), batch_size);
   dim3 threads(kThreadsPerBlock);
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(boxes.scalar_type(), "points_in_boxes_part_kernel", [&] {
     points_in_boxes_part_kernel<scalar_t><<<blocks, threads, 0, stream>>>(
-        boxes.data_ptr<scalar_t>(), points.data_ptr<scalar_t>(),
-        box_idx_of_points.data_ptr<int64_t>(), batch_size, num_boxes, num_points);
+        boxes.data_ptr<scalar_t>(), points.data_ptr<scalar_t>(), box_idx_of_points.data_ptr<int>(),
+        batch_size, num_boxes, num_points);
   });
   AT_CUDA_CHECK(cudaGetLastError());
 

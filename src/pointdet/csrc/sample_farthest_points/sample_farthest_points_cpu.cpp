@@ -22,8 +22,7 @@ at::Tensor FarthestPointSamplingCpu(const at::Tensor& points, const at::Tensor& 
 
   // Initialize an output array for the sampled indices
   // of shape (N, max_K)
-  auto long_opts = lengths.options();
-  auto sampled_indices = at::full({N, max_K}, -1, long_opts);
+  auto sampled_indices = at::full({N, max_K}, -1, lengths.options());
 
   // Create accessors for all tensors
   auto points_a = points.accessor<float, 3>();

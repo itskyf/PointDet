@@ -16,7 +16,7 @@ at::Tensor BallQueryCpu(const at::Tensor& p1, const at::Tensor& p2, const at::Te
   const int P1 = p1.size(1);
   const int D = p1.size(2);
 
-  auto int_opts = lengths1.options().dtype(at::kInt);
+  auto int_opts = p1.options().dtype(at::kInt);
   auto idxs = at::full({N, P1, K}, -1, int_opts);
   const float radius2 = radius * radius;
 

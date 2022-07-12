@@ -7,7 +7,7 @@
  */
 
 #pragma once
-#include <torch/extension.h>
+#include <ATen/ATen.h>
 
 #include <tuple>
 
@@ -48,7 +48,7 @@ at::Tensor FarthestPointSamplingCpu(const at::Tensor& points, const at::Tensor& 
                                     const at::Tensor& K, const at::Tensor& start_idxs);
 
 // Exposed implementation.
-at::Tensor FarthestPointSampling(const at::Tensor& points, const at::Tensor& lengths,
+inline at::Tensor FarthestPointSampling(const at::Tensor& points, const at::Tensor& lengths,
                                  const at::Tensor& K, const at::Tensor& start_idxs) {
   if (points.is_cuda() || lengths.is_cuda() || K.is_cuda()) {
 #ifdef WITH_CUDA

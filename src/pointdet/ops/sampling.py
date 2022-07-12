@@ -11,15 +11,26 @@ import torch
 
 from pointdet import _C
 
-from .utils import masked_gather
+
+def centroid_aware(cls_features: torch.Tensor, num_points: int) -> torch.Tensor:
+    """
+    Args:
+        cls_features (B, N, num_classes)
+    Returns:
+        indices (B, num_points)
+    """
+    cls_features_max = cls_features.max(dim=-1)[0]
+    score_pred = torch.sigmoid(cls_features_max)
+    out = torch.topk(score_pred, num_points, dim=-1)
+    return out.indices
 
 
 def sample_farthest_points(
     points: torch.Tensor,
+    num_points: Union[int, list[int], torch.Tensor] = 50,
     lengths: Optional[torch.Tensor] = None,
-    K: Union[int, list[int], torch.Tensor] = 50,
-    random_start_point: bool = False,
-) -> tuple[torch.Tensor, torch.Tensor]:
+    random_start: bool = False,
+) -> torch.Tensor:
     """
     Iterative farthest point sampling algorithm [1] to subsample a set of
     K points from a given pointcloud. At each iteration, a point is selected
@@ -33,41 +44,34 @@ def sample_farthest_points(
         on Point Sets in a Metric Space", NeurIPS 2017.
 
     Args:
-        points: (N, P, D) array containing the batch of pointclouds
-        lengths: (N,) number of points in each pointcloud (to support heterogeneous
+        points: (B, P, D) array containing the batch of pointclouds
+        lengths: (B,) number of points in each pointcloud (to support heterogeneous
             batches of pointclouds)
-        K: samples required in each sampled point cloud (this is typically << P). If
+        num_points: samples required in each sampled point cloud (this is typically << P). If
             K is an int then the same number of samples are selected for each
             pointcloud in the batch. If K is a tensor is should be length (N,)
             giving the number of samples to select for each element in the batch
-        random_start_point: bool, if True, a random point is selected as the starting
-            point for iterative sampling.
+        random_start: bool, if True, a random point is selected as the starting point.
 
     Returns:
-        selected_points: (N, K, D), array of selected values from points. If the input
-            K is a tensor, then the shape will be (N, max(K), D), and padded with
-            0.0 for batch elements where k_i < max(K).
-        selected_indices: (N, K) array of selected indices. If the input
-            K is a tensor, then the shape will be (N, max(K), D), and padded with
-            -1 for batch elements where k_i < max(K).
+        indices: (B, K) array of selected indices. If the input K is a tensor, then the shape
+            will be (B, max(K), D), and padded with -1 for batch elements where k_i < max(K).
     """
-    N, P = points.shape[:2]
+    batch_size, total_points = points.shape[:2]
     device = points.device
 
     # Validate inputs
     if lengths is None:
-        lengths = torch.full((N,), P, dtype=torch.int64, device=device)
-
-    if lengths.shape != (N,):
-        raise ValueError("points and lengths must have same batch dimension")
-
+        lengths = torch.full((batch_size,), total_points, dtype=torch.int64, device=device)
+    if lengths.shape != (batch_size,):
+        raise ValueError("points and lengths must have same batch dimension.")
     # TODO: support providing K as a ratio of the total number of points instead of as an int
-    if isinstance(K, int):
-        K = torch.full((N,), K, dtype=torch.int64, device=device)
-    elif isinstance(K, list):
-        K = torch.tensor(K, dtype=torch.int64, device=device)
+    if isinstance(num_points, int):
+        num_points = torch.full((batch_size,), num_points, dtype=torch.int64, device=device)
+    elif isinstance(num_points, list):
+        num_points = torch.tensor(num_points, dtype=torch.int64, device=device)
 
-    if K.size(0) != N:
+    if num_points.size(0) != batch_size:
         raise ValueError("K and points must have the same batch dimension")
 
     # Check dtypes are correct and convert if necessary
@@ -75,79 +79,69 @@ def sample_farthest_points(
         points = points.float()
     if lengths.dtype != torch.int64:
         lengths = lengths.long()
-    if K.dtype != torch.int64:
-        K = K.long()
+    if num_points.dtype != torch.int64:
+        num_points = num_points.long()
 
     # Generate the starting indices for sampling
     start_idxs = torch.zeros_like(lengths)
-    if random_start_point:
-        for n in range(N):
+    if random_start:
+        for b_idx in range(batch_size):
             # pyre-fixme[6]: For 1st param expected `int` but got `Tensor`.
-            start_idxs[n] = torch.randint(high=lengths[n], size=(1,)).item()
+            start_idxs[b_idx] = torch.randint(high=lengths[b_idx], size=(1,)).item()
 
     with torch.no_grad():
         # pyre-fixme[16]: `pytorch3d_._C` has no attribute `sample_farthest_points`.
-        idx = _C.sample_farthest_points(points, lengths, K, start_idxs)
-    sampled_points = masked_gather(points, idx)
-
-    return sampled_points, idx
+        indices = _C.sample_farthest_points(points, lengths, num_points, start_idxs)
+    return indices
 
 
 def sample_farthest_points_naive(
     points: torch.Tensor,
+    num_points: Union[int, list[int], torch.Tensor] = 50,
     lengths: Optional[torch.Tensor] = None,
-    K: Union[int, list[int], torch.Tensor] = 50,
-    random_start_point: bool = False,
-) -> tuple[torch.Tensor, torch.Tensor]:
+    random_start: bool = False,
+) -> torch.Tensor:
     """
     Same Args/Returns as sample_farthest_points
     """
-    N, P = points.shape[:2]
+    batch_size, total_points = points.shape[:2]
     device = points.device
 
     # Validate inputs
     if lengths is None:
-        lengths = torch.full((N,), P, dtype=torch.int64, device=device)
+        lengths = torch.full((batch_size,), total_points, dtype=torch.int64, device=device)
 
-    if lengths.size(0) != N:
-        raise ValueError("points and lengths must have same batch dimension")
+    if lengths.shape[0] != batch_size:
+        raise ValueError("points and lengths must have same batch dimension.")
 
     # TODO: support providing K as a ratio of the total number of points instead of as an int
-    if isinstance(K, int):
-        K = torch.full((N,), K, dtype=torch.int64, device=device)
-    elif isinstance(K, list):
-        K = torch.tensor(K, dtype=torch.int64, device=device)
-
-    if K.size(0) != N:
+    if isinstance(num_points, int):
+        num_points = torch.full((batch_size,), num_points, dtype=torch.int64, device=device)
+    elif isinstance(num_points, list):
+        num_points = torch.tensor(num_points, dtype=torch.int64, device=device)
+    if num_points.size(0) != batch_size:
         raise ValueError("K and points must have the same batch dimension")
 
     # Find max value of K
-    max_K = torch.max(K)
-
+    max_k = torch.max(num_points)
     # List of selected indices from each batch element
     all_sampled_indices = []
 
-    for n in range(N):
+    for n in range(batch_size):
         # Initialize an array for the sampled indices, shape: (max_K,)
-        sample_idx_batch = torch.full(
-            # pyre-fixme[6]: For 1st param expected `Union[List[int], Size,
-            #  typing.Tuple[int, ...]]` but got `Tuple[Tensor]`.
-            (max_K,),
-            fill_value=-1,
-            dtype=torch.int64,
-            device=device,
-        )
+        # pyre-fixme[6]: For 1st param expected `Union[List[int], Size,
+        #  typing.Tuple[int, ...]]` but got `Tuple[Tensor]`.
+        sample_idx_batch = torch.full((max_k,), fill_value=-1, dtype=torch.int64, device=device)
 
         # Initialize closest distances to inf, shape: (P,)
         # This will be updated at each iteration to track the closest distance of the
         # remaining points to any of the selected points
-
         # pyre-fixme[6]: For 1st param expected `Union[List[int], Size,
         #  typing.Tuple[int, ...]]` but got `Tuple[Tensor]`.
         closest_dists = points.new_full((lengths[n],), float("inf"), dtype=torch.float32)
 
         # Select a random point index and save it as the starting point
-        selected_idx = randint(0, lengths[n] - 1) if random_start_point else 0
+        selected_idx = randint(0, lengths[n] - 1) if random_start else 0
         sample_idx_batch[0] = selected_idx
 
         # If the pointcloud has fewer than K points then only iterate over the min
@@ -155,7 +149,7 @@ def sample_farthest_points_naive(
         #  `Tensor`.
         # pyre-fixme[6]: For 2nd param expected `SupportsRichComparisonT` but got
         #  `Tensor`.
-        k_n = min(lengths[n], K[n])
+        k_n = min(lengths[n], num_points[n])
 
         # Iteratively select points for a maximum of k_n
         for i in range(1, k_n):
@@ -179,10 +173,7 @@ def sample_farthest_points_naive(
         # Add the list of points for this batch to the final list
         all_sampled_indices.append(sample_idx_batch)
 
-    all_sampled_indices = torch.stack(all_sampled_indices, dim=0)
-
+    all_sampled_indices = torch.stack(all_sampled_indices)
     # Gather the points
-    all_sampled_points = masked_gather(points, all_sampled_indices)
-
     # Return (N, max_K, D) subsampled points and indices
-    return all_sampled_points, all_sampled_indices
+    return all_sampled_indices

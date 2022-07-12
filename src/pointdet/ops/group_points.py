@@ -14,7 +14,6 @@ class QueryAndGroup(nn.Module):
     Args:
         radius (float): The maximum radius of the balls.
         num_neighbors (int): Maximum number of features to gather in the ball.
-        use_xyz (bool): Whether to use xyz. Default: True.
         return_grouped_xyz (bool): Whether to return grouped xyz. Default: False.
         normalize_xyz (bool): Whether to normalize xyz. Default: False.
         uniform_sample (bool): Whether to sample uniformly. Default: False
@@ -36,28 +35,27 @@ class QueryAndGroup(nn.Module):
 
     def forward(
         self,
-        points_xyz: torch.Tensor,
-        center_xyz: torch.Tensor,
+        points: torch.Tensor,
+        centroids: torch.Tensor,
         features: Optional[torch.Tensor] = None,
     ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         """
         Args:
-            points_xyz (torch.Tensor): (B, N, 3) xyz coordinates of the points.
-            center_xyz (torch.Tensor): (B, num_groups, 3) coordinates of the centriods.
+            points (torch.Tensor): (B, N, D) coordinates of the points.
+            centroids (torch.Tensor): (B, K, D) coordinates of the centriods.
             features (torch.Tensor): (B, C, N) The features of grouped points.
         Returns:
-            grouped_xyz: (B, 3, num_groups, num_neighbors)
-            grouped_features: (B, C, num_groups, num_neighbors)
-            Grouped coordinates and features of points.
+            grouped_xyz: (B, D, K, num_neighbors)
+            grouped_features: (B, C, K, num_neighbors)
         """
-        # (B, num_groups, num_neighbors)
-        indices = ball_query(center_xyz, points_xyz, self.num_neighbors, self.radius)
-        xyz_trans = points_xyz.transpose(1, 2).contiguous()
-        # (B, 3, num_groups, num_neighbors)
-        grouped_xyz = _grouping_operation.apply(xyz_trans, indices)
+        # (B, K, num_neighbors)
+        indices = ball_query(centroids, points, self.num_neighbors, self.radius)
+        # Transpose since last dim of points is its features
+        # (B, 3, K, num_neighbors)
+        grouped_xyz = _grouping_operation.apply(points.transpose(1, 2), indices)
         # Relative offsets
         if self.relative_xyz:
-            grouped_xyz -= center_xyz.transpose(1, 2).unsqueeze(-1)
+            grouped_xyz -= centroids.transpose(1, 2).unsqueeze(-1)
         if self.normalize_xyz:
             grouped_xyz /= self.radius
 
@@ -65,6 +63,16 @@ class QueryAndGroup(nn.Module):
             grouped_features = _grouping_operation.apply(features, indices)
             return grouped_xyz, grouped_features
         return grouped_xyz, None
+
+    def extra_repr(self):
+        return ", ".join(
+            [
+                f"num_neighbors={self.num_neighbors}",
+                f"radius={self.radius}",
+                f"relative_xyz={self.relative_xyz}",
+                f"normalize_xyz={self.normalize_xyz}",
+            ]
+        )
 
 
 class _grouping_operation(Function):
@@ -77,7 +85,7 @@ class _grouping_operation(Function):
             features (Tensor): (B, feat_dims, num_feats) tensor of features to group.
             indices (Tensor): (B, P1, K) the indices of features to group with.
         Returns:
-            Tensor: (B, C, num_groups, num_neighbors) Grouped features.
+            Tensor: (B, C, K, num_neighbors) Grouped features.
         """
         grouped_feats = _C.group_points(features, indices)
         ctx.for_backwards = (indices, features.size(2))
@@ -87,7 +95,7 @@ class _grouping_operation(Function):
     def backward(ctx, grad_out: torch.Tensor):
         """
         Args:
-            grad_out (Tensor): (B, C, num_groups, num_neighbors)
+            grad_out (Tensor): (B, C, K, num_neighbors)
             tensor of the gradients of the output from forward.
         Returns:
             Tensor: (B, C, N) gradient of the features.

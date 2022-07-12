@@ -241,20 +241,22 @@ bool InBounds(const int64_t min, const int64_t x, const int64_t max) {
 }
 
 bool KnnCheckVersion(int version, const int64_t D, const int64_t K) {
-  if (version == 0) {
-    return true;
-  } else if (version == 1) {
-    return InBounds(V1_MIN_D, D, V1_MAX_D);
-  } else if (version == 2) {
-    return InBounds(V2_MIN_D, D, V2_MAX_D) && InBounds(V2_MIN_K, K, V2_MAX_K);
-  } else if (version == 3) {
-    return InBounds(V3_MIN_D, D, V3_MAX_D) && InBounds(V3_MIN_K, K, V3_MAX_K);
+  switch (version) {
+    case 0:
+      return True;
+    case 1:
+      return InBounds(V1_MIN_D, D, V1_MAX_D);
+    case 2:
+      return InBounds(V2_MIN_D, D, V2_MAX_D) && InBounds(V2_MIN_K, K, V2_MAX_K);
+    case 3:
+      return InBounds(V3_MIN_D, D, V3_MAX_D) && InBounds(V3_MIN_K, K, V3_MAX_K);
+    default:
+      return false;
   }
-  return false;
 }
 
 int ChooseVersion(const int64_t D, const int64_t K) {
-  for (int version = 3; version >= 1; version--) {
+  for (int version = 3; version >= 1; --version) {
     if (KnnCheckVersion(version, D, K)) {
       return version;
     }
@@ -282,7 +284,7 @@ std::tuple<at::Tensor, at::Tensor> KNearestNeighborIdxCuda(
   const auto D = p2.size(2);
   const int64_t K_64 = K;
 
-  TORCH_CHECK((norm == 1) || (norm == 2), "Norm must be 1 or 2.");
+  TORCH_CHECK((norm == 1) || (norm == 2), "Norm must be 1 or 2");
 
   TORCH_CHECK(p2.size(2) == D, "Point sets must have the same last dimension");
   auto long_dtype = lengths1.options().dtype(at::kLong);

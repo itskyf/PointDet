@@ -1,5 +1,5 @@
 #pragma once
-#include <torch/extension.h>
+#include <ATen/ATen.h>
 
 // TODO CPU implementation
 
@@ -29,8 +29,8 @@ at::Tensor GroupPointsBackwardCuda(const at::Tensor grad_out, const at::Tensor i
                                    const int batch_size, const int feat_dims, const int num_feats,
                                    const int num_groups, const int num_neighbors);
 
-at::Tensor GroupPointsBackward(const at::Tensor grad_out, const at::Tensor indices,
-                               const int num_feats) {
+inline at::Tensor GroupPointsBackward(const at::Tensor grad_out, const at::Tensor indices,
+                                      const int num_feats) {
   const int batch_size = grad_out.size(0), feat_dims = grad_out.size(1);
   const int num_groups = grad_out.size(2), num_neighbors = grad_out.size(3);
   if (grad_out.is_cuda() || indices.is_cuda()) {

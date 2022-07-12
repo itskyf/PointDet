@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <torch/extension.h>
+#include <ATen/ATen.h>
 
 #include <iterator>
 #include <random>
@@ -18,12 +18,12 @@ at::Tensor FarthestPointSamplingCpu(const at::Tensor& points, const at::Tensor& 
   const int64_t N = points.size(0);
   const int64_t P = points.size(1);
   const int64_t D = points.size(2);
-  const int64_t max_K = torch::max(K).item<int64_t>();
+  const int64_t max_K = at::max(K).item<int64_t>();
 
   // Initialize an output array for the sampled indices
   // of shape (N, max_K)
   auto long_opts = lengths.options();
-  torch::Tensor sampled_indices = torch::full({N, max_K}, -1, long_opts);
+  auto sampled_indices = at::full({N, max_K}, -1, long_opts);
 
   // Create accessors for all tensors
   auto points_a = points.accessor<float, 3>();

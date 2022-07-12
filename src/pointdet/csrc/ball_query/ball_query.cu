@@ -23,7 +23,7 @@ __global__ void BallQueryKernel(
     const at::PackedTensorAccessor64<scalar_t, 3, at::RestrictPtrTraits> p2,
     const at::PackedTensorAccessor64<int64_t, 1, at::RestrictPtrTraits> lengths1,
     const at::PackedTensorAccessor64<int64_t, 1, at::RestrictPtrTraits> lengths2,
-    at::PackedTensorAccessor64<int64_t, 3, at::RestrictPtrTraits> idxs, const int64_t K,
+    at::PackedTensorAccessor32<int32_t, 3, at::RestrictPtrTraits> idxs, const int64_t K,
     const float radius2) {
   const int64_t N = p1.size(0);
   const int64_t chunks_per_cloud = (1 + (p1.size(1) - 1) / blockDim.x);
@@ -84,16 +84,15 @@ at::Tensor BallQueryCuda(const at::Tensor& p1,        // (N, P1, 3)
   const float radius2 = radius * radius;
 
   // Output tensor with indices of neighbors for each point in p1
-  auto long_dtype = lengths1.options().dtype(at::kLong);
-  auto idxs = at::full({N, P1, K}, -1, long_dtype);
+  auto int_dtype = lengths1.options().dtype(at::kInt);
+  auto idxs = at::full({N, P1, K}, -1, int_dtype);
 
   if (idxs.numel() == 0) {
     AT_CUDA_CHECK(cudaGetLastError());
     return idxs;
   }
 
-  constexpr size_t blocks = 256;
-  constexpr size_t threads = 256;
+  constexpr size_t blocks = 256, threads = 256;
 
   AT_DISPATCH_FLOATING_TYPES(p1.scalar_type(), "ball_query_kernel_cuda", [&] {
     BallQueryKernel<<<blocks, threads, 0, stream>>>(
@@ -101,7 +100,7 @@ at::Tensor BallQueryCuda(const at::Tensor& p1,        // (N, P1, 3)
         p2.packed_accessor64<float, 3, at::RestrictPtrTraits>(),
         lengths1.packed_accessor64<int64_t, 1, at::RestrictPtrTraits>(),
         lengths2.packed_accessor64<int64_t, 1, at::RestrictPtrTraits>(),
-        idxs.packed_accessor64<int64_t, 3, at::RestrictPtrTraits>(), K_64, radius2);
+        idxs.packed_accessor32<int32_t, 3, at::RestrictPtrTraits>(), K_64, radius2);
   });
   AT_CUDA_CHECK(cudaGetLastError());
   return idxs;

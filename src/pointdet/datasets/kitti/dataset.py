@@ -44,10 +44,10 @@ class KittiDataset(IDataset):
             assert info.annos is not None
             annos = self._get_annotation(info.annos, rect, trv2c)
 
-        v_path = self.path / self.pts_prefix / f"{info.sample_idx:06d}.pt"
+        v_path = self.path / self.pts_prefix / f"{info.index:06d}.pt"
         points = torch.load(v_path)
         points = LiDARPoints(points, points_dim=points.size(-1))
-        return PointCloud(info.sample_idx, lidar2img, points, annos)
+        return PointCloud(info.index, lidar2img, points, annos)
 
     def _get_annotation(
         self, annos: KittiAnnotation, rect: NDArray[np.float32], trv2c: NDArray[np.float32]

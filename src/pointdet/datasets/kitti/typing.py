@@ -35,7 +35,7 @@ class KittiAnnotation:
 
 @dataclass
 class KittiInfo:
-    sample_idx: int
+    index: int
     calib: KittiCalib
     img_shape: NDArray[np.int32]
     num_features: int

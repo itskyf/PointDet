@@ -74,11 +74,10 @@ def create_groundtruth_database(
         point_indices = box_np_ops.points_in_rbbox(points.numpy(), bboxes_3d.numpy())
 
         group_dict = {}
-        img_idx = pcd.sample_idx
         for gt_idx, (bbox_3d, diff, name, local_gid) in enumerate(
             zip(bboxes_3d, difficulty, names, group_ids)
         ):
-            filename = f"{img_idx}_{name}_{gt_idx}.pt"
+            filename = f"{pcd.index}_{name}_{gt_idx}.pt"
             rel_path = rel_dir / filename
 
             # save point clouds and image patches for each object
@@ -92,7 +91,7 @@ def create_groundtruth_database(
             gid = group_dict[local_gid]
             num_gt_pts = gt_points.shape[0]
             db_infos[name].append(
-                DBInfo(name, bbox_3d, rel_path, diff, gid, gt_idx, img_idx, num_gt_pts)
+                DBInfo(name, bbox_3d, rel_path, diff, gid, gt_idx, pcd.index, num_gt_pts)
             )
 
     for name, cls_infos in db_infos.items():

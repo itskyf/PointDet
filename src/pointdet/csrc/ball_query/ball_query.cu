@@ -5,7 +5,7 @@
 #include "utils/cuda_utils.hpp"
 
 template <typename T>
-__global__ void ball_query_kernel(const T* centroids, const T* points, int* indices,
+__global__ void ball_query_kernel(const T* p_centroids, const T* p_points, int* p_indices,
                                   const int batch_size, const int num_groups,
                                   const int num_neighbors, const int total_points,
                                   const float radius2) {
@@ -16,23 +16,23 @@ __global__ void ball_query_kernel(const T* centroids, const T* points, int* indi
       return;
     }
 
-    centroids += bs_idx * num_groups * 3 + pt_idx * 3;
-    points += bs_idx * total_points * 3;
-    indices += bs_idx * num_groups * num_neighbors + pt_idx * num_neighbors;
+    p_centroids += bs_idx * num_groups * 3 + pt_idx * 3;
+    p_points += bs_idx * total_points * 3;
+    p_indices += bs_idx * num_groups * num_neighbors + pt_idx * num_neighbors;
 
-    const T c_x = centroids[0], c_y = centroids[1], c_z = centroids[2];
+    const T c_x = p_centroids[0], c_y = p_centroids[1], c_z = p_centroids[2];
 
     int cnt = 0;
     for (int k = 0; k < total_points; ++k) {
-      const T x = points[k * 3 + 0], y = points[k * 3 + 1], z = points[k * 3 + 2];
+      const T x = p_points[k * 3 + 0], y = p_points[k * 3 + 1], z = p_points[k * 3 + 2];
       const T d2 = (c_x - x) * (c_x - x) + (c_y - y) * (c_y - y) + (c_z - z) * (c_z - z);
       if (d2 < radius2) {
         if (cnt == 0) {
           for (int l = 0; l < num_neighbors; ++l) {
-            indices[l] = k;
+            p_indices[l] = k;
           }
         }
-        indices[cnt] = k;
+        p_indices[cnt] = k;
         if (++cnt >= num_neighbors) {
           break;
         }

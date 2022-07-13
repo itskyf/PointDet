@@ -92,7 +92,7 @@ class _grouping_operation(Function):
         return grouped_feats
 
     @staticmethod
-    def backward(ctx, grad_out: torch.Tensor):
+    def backward(ctx, grad_grouped: torch.Tensor):
         """
         Args:
             grad_out (Tensor): (B, C, K, num_neighbors)
@@ -101,5 +101,5 @@ class _grouping_operation(Function):
             Tensor: (B, C, N) gradient of the features.
         """
         indices, num_feats = ctx.for_backwards
-        grad_features = _C.group_points_backward(grad_out.data, indices, num_feats)
-        return grad_features, None
+        grad_feats = _C.group_points_backward(grad_grouped.data, indices, num_feats)
+        return grad_feats, None

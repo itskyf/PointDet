@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 @dataclass
 class BoxAnnotation:
     bboxes_3d: LiDARBoxes3D
-    labels: NDArray[np.int32]
+    labels: NDArray[np.int64]  # int64 for indexing
     bboxes: NDArray[np.float32]
     difficulty: NDArray[np.int32]
     group_ids: NDArray[np.int32]
@@ -46,13 +46,13 @@ class PCDAugmentation:
 
 @dataclass
 class PointCloud:
-    sample_idx: int
+    index: int
     lidar2img: NDArray[np.float32]
     points: LiDARPoints
     annos: Optional[BoxAnnotation] = None
 
     gt_bboxes_3d: LiDARBoxes3D = field(init=False)
-    gt_labels_3d: NDArray[np.int32] = field(init=False)
+    gt_labels_3d: NDArray[np.int64] = field(init=False)
 
     aug_info: PCDAugmentation = field(default_factory=PCDAugmentation)
 

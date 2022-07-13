@@ -1,18 +1,22 @@
-from torch import Tensor
-from torch.autograd import Function
+import torch
+from torch import autograd
 from torch.autograd.function import FunctionCtx, once_differentiable
 
 from pointdet import _C
 
 
-class BallQuery(Function):
+class BallQuery(autograd.Function):
     """
     Torch autograd Function wrapper for Ball Query C++/CUDA implementations.
     """
 
     @staticmethod
     def forward(
-        ctx: FunctionCtx, centroids: Tensor, points: Tensor, num_neighbors: int, radius: float
+        ctx: FunctionCtx,
+        centroids: torch.Tensor,
+        points: torch.Tensor,
+        num_neighbors: int,
+        radius: float,
     ):
         """
         Arguments defintions the same as in the ball_query function
@@ -23,7 +27,7 @@ class BallQuery(Function):
 
     @staticmethod
     @once_differentiable
-    def backward(ctx: FunctionCtx, grad_indices: Tensor):
+    def backward(ctx: FunctionCtx, grad_indices: torch.Tensor):
         return None, None, None, None
 
 

@@ -15,9 +15,9 @@ from .utils import box_collision_test
 DBInfos = dict[str, list[DBInfo]]
 
 
-class _DBSamples(NamedTuple):
+class DBSamples(NamedTuple):
     bboxes_3d: NDArray[np.float32]
-    labels_3d: NDArray[np.int32]
+    labels_3d: NDArray[np.int64]
     group_ids: NDArray[np.int32]
     points: torch.Tensor
 
@@ -78,7 +78,6 @@ class BatchSampler:
     def _reset_idx(self):
         """Reset the index of batchsampler to zero."""
         assert self._name is not None
-        # print("reset", self._name)
         if self._shuffle:
             self._rng.shuffle(self._indices)
         self._idx = 0
@@ -130,12 +129,12 @@ class DBSampler:
         }
 
     def __call__(
-        self, gt_bboxes: NDArray[np.float32], gt_labels: NDArray[np.int32]
-    ) -> Optional[_DBSamples]:
+        self, gt_boxes: NDArray[np.float32], gt_labels: NDArray[np.int64]
+    ) -> Optional[DBSamples]:
         """Sampling all categories of bboxes.
 
         Args:
-            gt_bboxes (np.ndarray): Ground truth bounding boxes.
+            gt_boxes (np.ndarray): Ground truth bounding boxes.
             gt_labels (np.ndarray): Ground truth labels of boxes.
 
         Returns:
@@ -157,7 +156,7 @@ class DBSampler:
 
         sampled: list[DBInfo] = []
         sampled_bboxes = []
-        avoid_coll_boxes = gt_bboxes
+        avoid_coll_boxes = gt_boxes
 
         for cls_name, num_sample in num_sample_dict.items():
             sampled_cls = self._sample_class_v2(cls_name, num_sample, avoid_coll_boxes)
@@ -181,10 +180,10 @@ class DBSampler:
             sampled_pts_tensors.append(points)
         # TODO ground_plane
         sampled_bboxes = np.concatenate(sampled_bboxes)
-        sampled_labels = np.array([self.name2label[info.name] for info in sampled], dtype=np.int32)
-        group_ids = np.arange(gt_bboxes.shape[0], gt_bboxes.shape[0] + len(sampled))
+        sampled_labels = np.array([self.name2label[info.name] for info in sampled], dtype=np.int64)
+        group_ids = np.arange(gt_boxes.shape[0], gt_boxes.shape[0] + len(sampled))
         points = torch.cat(sampled_pts_tensors)
-        return _DBSamples(sampled_bboxes, sampled_labels, group_ids, points)
+        return DBSamples(sampled_bboxes, sampled_labels, group_ids, points)
 
     @staticmethod
     def filter_by_difficulty(db_infos: DBInfos, del_difficulties: list[int]) -> DBInfos:
@@ -219,7 +218,7 @@ class DBSampler:
                 db_infos[name] = [info for info in db_infos[name] if info.num_gt_points >= min_num]
         return db_infos
 
-    def _sample_class_v2(self, name: str, num: int, gt_bboxes: NDArray[np.float32]) -> list[DBInfo]:
+    def _sample_class_v2(self, name: str, num: int, gt_boxes: NDArray[np.float32]) -> list[DBInfo]:
         """Sampling specific categories of bounding boxes.
 
         Args:
@@ -232,16 +231,16 @@ class DBSampler:
         """
         sampled: list[DBInfo] = copy.deepcopy(self._sampler_dict[name](num))  # TODO copy necessary?
 
-        num_gt = gt_bboxes.shape[0]
+        num_gt = gt_boxes.shape[0]
         num_sampled = len(sampled)
         gt_bboxes_bv = box_np_ops.center_to_corner_box2d(
-            gt_bboxes[:, 0:2], gt_bboxes[:, 3:5], gt_bboxes[:, 6]
+            gt_boxes[:, 0:2], gt_boxes[:, 3:5], gt_boxes[:, 6]
         )
 
         sp_boxes = np.stack([db_info.box3d_lidar for db_info in sampled])
-        boxes = np.concatenate([gt_bboxes, sp_boxes])
+        boxes = np.concatenate([gt_boxes, sp_boxes])
 
-        sp_boxes_new = boxes[gt_bboxes.shape[0] :]
+        sp_boxes_new = boxes[gt_boxes.shape[0] :]
         sp_boxes_bv = box_np_ops.center_to_corner_box2d(
             sp_boxes_new[:, 0:2], sp_boxes_new[:, 3:5], sp_boxes_new[:, 6]
         )
@@ -288,13 +287,13 @@ class GTSampler:
         # TODO use ground_plane
         # change to float for blending operation
         # TODO sample 2D
-        sampled: Optional[_DBSamples] = self.db_sampler(gt_bboxes_3d, gt_labels_3d)
+        sampled: Optional[DBSamples] = self.db_sampler(gt_bboxes_3d, gt_labels_3d)
         if sampled is not None:
             # Add sampled boxes to scene
             pcd.gt_bboxes_3d = pcd.gt_bboxes_3d.new_boxes(
                 np.concatenate([gt_bboxes_3d, sampled.bboxes_3d])
             )
-            pcd.gt_labels_3d = np.concatenate([gt_labels_3d, sampled.labels_3d])
+            pcd.gt_labels_3d = np.concatenate([gt_labels_3d, sampled.labels_3d], dtype=np.int64)
             points = _remove_points_in_boxes(pcd.points, sampled.bboxes_3d)
             attr_dims = points.attr_dims
             points = torch.cat([sampled.points, points.tensor])

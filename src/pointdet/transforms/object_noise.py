@@ -111,7 +111,6 @@ def _noise_per_box(boxes, valid_mask, loc_noises, rot_noises):
                 current_corners += boxes[i, :2] + loc_noises[i, j, :2]
                 coll_mat = box_collision_test(current_corners.reshape(1, 4, 2), box_corners)
                 coll_mat[0, i] = False
-                # print(coll_mat)
                 if not coll_mat.any():
                     success_mask[i] = j
                     box_corners[i] = current_corners

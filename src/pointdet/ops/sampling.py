@@ -12,13 +12,13 @@ def centroid_aware(cls_features: torch.Tensor, num_points: int) -> torch.Tensor:
     Returns:
         indices (B, num_points)
     """
-    cls_features_max = cls_features.max(dim=-1)[0]
+    cls_features_max = cls_features.max(dim=-1).values
     score_pred = torch.sigmoid(cls_features_max)
     out = torch.topk(score_pred, num_points, dim=-1)
     return out.indices
 
 
-class FurthestPointSampling(Function):
+class FarthestPointSampling(Function):
     """Uses iterative furthest point sampling to select a set of features whose
     corresponding points have the furthest distance."""
 
@@ -41,4 +41,4 @@ class FurthestPointSampling(Function):
         return None, None
 
 
-sample_farthest_points = FurthestPointSampling.apply
+sample_farthest_points = FarthestPointSampling.apply

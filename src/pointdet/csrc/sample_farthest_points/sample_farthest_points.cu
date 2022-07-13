@@ -14,8 +14,9 @@ __device__ void __update(float *__restrict__ dists, int *__restrict__ dists_i, c
 
 template <unsigned int block_size>
 __global__ void farthest_point_sampling_kernel(const float *__restrict__ points,
-                                               float *__restrict__ temp, int *__restrict__ indices,
-                                               int batch_size, int total_points, int num_points) {
+                                               float *__restrict__ temp,
+                                               int64_t *__restrict__ indices, int batch_size,
+                                               int total_points, int num_points) {
   if (num_points <= 0) {
     return;
   }
@@ -27,8 +28,7 @@ __global__ void farthest_point_sampling_kernel(const float *__restrict__ points,
   temp += batch_idx * total_points;
   indices += batch_idx * num_points;
 
-  int tid = threadIdx.x;
-  const int stride = block_size;
+  const int tid = threadIdx.x, stride = block_size;
 
   int old = 0;
   if (threadIdx.x == 0) {
@@ -39,17 +39,12 @@ __global__ void farthest_point_sampling_kernel(const float *__restrict__ points,
   for (int j = 1; j < num_points; ++j) {
     int besti = 0;
     float best = -1;
-    float x1 = points[old * 3 + 0];
-    float y1 = points[old * 3 + 1];
-    float z1 = points[old * 3 + 2];
+    const float x1 = points[old * 3 + 0], y1 = points[old * 3 + 1], z1 = points[old * 3 + 2];
     for (int k = tid; k < total_points; k += stride) {
-      float x2, y2, z2;
-      x2 = points[k * 3 + 0];
-      y2 = points[k * 3 + 1];
-      z2 = points[k * 3 + 2];
+      const float x2 = points[k * 3 + 0], y2 = points[k * 3 + 1], z2 = points[k * 3 + 2];
 
-      float d = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1) + (z2 - z1) * (z2 - z1);
-      float d2 = fmin(d, temp[k]);
+      const float d = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1) + (z2 - z1) * (z2 - z1);
+      const float d2 = fmin(d, temp[k]);
       temp[k] = d2;
       besti = d2 > best ? k : besti;
       best = d2 > best ? d2 : best;
@@ -78,13 +73,13 @@ at::Tensor FarthestPointSamplingCuda(const at::Tensor &points, const int batch_s
                                      const int total_points, const int num_points) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
 
-  auto pt_ops = points.options().dtype(at::kInt);
-  at::Tensor indices = at::zeros({batch_size, num_points}, pt_ops.dtype(at::kInt));
+  auto pt_ops = points.options();
+  at::Tensor indices = at::zeros({batch_size, num_points}, pt_ops.dtype(at::kLong));
   at::Tensor tmp_tensor = at::full({batch_size, total_points}, 1e10, pt_ops);
 
   const float *p_points = points.data_ptr<float>();
   float *p_tmp = tmp_tensor.data_ptr<float>();
-  int *p_indices = indices.data_ptr<int>();
+  int64_t *p_indices = indices.data_ptr<int64_t>();
 
   const int pow_2 = std::log(static_cast<double>(total_points)) / std::log(2.0);
   const int n_threads = std::max(std::min(1 << pow_2, 1024), 1);

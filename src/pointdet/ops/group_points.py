@@ -52,7 +52,7 @@ class QueryAndGroup(nn.Module):
         indices = ball_query(centroids, points, self.num_neighbors, self.radius)
         # Transpose since last dim of points is its features
         # (B, 3, K, num_neighbors)
-        grouped_xyz = _grouping_operation.apply(points.transpose(1, 2), indices)
+        grouped_xyz = grouping_ops(points.transpose(1, 2), indices)
         # Relative offsets
         if self.relative_xyz:
             grouped_xyz -= centroids.transpose(1, 2).unsqueeze(-1)
@@ -60,7 +60,7 @@ class QueryAndGroup(nn.Module):
             grouped_xyz /= self.radius
 
         if features is not None:
-            grouped_features = _grouping_operation.apply(features, indices)
+            grouped_features = grouping_ops(features, indices)
             return grouped_xyz, grouped_features
         return grouped_xyz, None
 
@@ -75,7 +75,7 @@ class QueryAndGroup(nn.Module):
         )
 
 
-class _grouping_operation(Function):
+class GroupingOperation(Function):
     """Group feature with given index."""
 
     @staticmethod
@@ -85,7 +85,7 @@ class _grouping_operation(Function):
             features (Tensor): (B, feat_dims, num_feats) tensor of features to group.
             indices (Tensor): (B, P1, K) the indices of features to group with.
         Returns:
-            Tensor: (B, C, K, num_neighbors) Grouped features.
+            (B, C, K, num_neighbors) Grouped features.
         """
         grouped_feats = _C.group_points(features, indices)
         ctx.for_backwards = (indices, features.size(2))
@@ -98,8 +98,11 @@ class _grouping_operation(Function):
             grad_out (Tensor): (B, C, K, num_neighbors)
             tensor of the gradients of the output from forward.
         Returns:
-            Tensor: (B, C, N) gradient of the features.
+            (B, C, N) gradient of the features.
         """
         indices, num_feats = ctx.for_backwards
         grad_feats = _C.group_points_backward(grad_grouped.data, indices, num_feats)
         return grad_feats, None
+
+
+grouping_ops = GroupingOperation.apply

@@ -14,10 +14,9 @@ from .typing import KittiAnnotation, KittiInfo
 
 
 class KittiDataset(IDataset):
-    CLASSES = ("Car", "Pedestrian", "Cyclist")
-
     def __init__(
         self,
+        classes: list[str],
         root: Path,
         split: str,
         pts_prefix: str,
@@ -30,6 +29,7 @@ class KittiDataset(IDataset):
         info_path = root / f"{info_prefix}_infos_{split}.pkl"
         super().__init__(info_path, transforms, training=split == "train", seed=seed)
 
+        self.classes = classes
         self.path = root / ("testing" if split == "test" else "training")
         self.pts_prefix = pts_prefix
 
@@ -72,12 +72,11 @@ class KittiDataset(IDataset):
             [annos.location, annos.dimensions, rots], axis=1, dtype=np.float32
         )
         cam_bboxes3d = CameraBoxes3D(cam_bboxes3d)
-
         bboxes_3d = LiDARBoxes3D.from_camera_box3d(cam_bboxes3d, rect, trv2c)
         # TODO process when there is plane
 
-        labels = [self.CLASSES.index(name) if name in self.CLASSES else -1 for name in annos.names]
-        labels = np.array(labels, dtype=np.int32)
+        labels = [self.classes.index(name) if name in self.classes else -1 for name in annos.names]
+        labels = np.array(labels, dtype=np.int64)
         return BoxAnnotation(
             bboxes_3d, labels, annos.bboxes, annos.difficulty, annos.group_ids, annos.names
         )

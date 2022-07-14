@@ -109,8 +109,8 @@ class DBSampler:
         self.data_root = root
         self.info_path = root / info_name
         self.rate = rate
-        self.name2label = {name: i for i, name in enumerate(classes)}
-        self.label2name = dict(enumerate(classes))
+        # Label starts at 1 (inside dataset)
+        self.name2label = {name: i + 1 for i, name in enumerate(classes)}
 
         # TODO logging
         # Filter database infos

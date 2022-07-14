@@ -75,7 +75,10 @@ class KittiDataset(IDataset):
         bboxes_3d = LiDARBoxes3D.from_camera_box3d(cam_bboxes3d, rect, trv2c)
         # TODO process when there is plane
 
-        labels = [self.classes.index(name) if name in self.classes else -1 for name in annos.names]
+        # +1 for using one-hot with background is 0
+        labels = [
+            self.classes.index(name) + 1 if name in self.classes else 0 for name in annos.names
+        ]
         labels = np.array(labels, dtype=np.int64)
         return BoxAnnotation(
             bboxes_3d, labels, annos.bboxes, annos.difficulty, annos.group_ids, annos.names

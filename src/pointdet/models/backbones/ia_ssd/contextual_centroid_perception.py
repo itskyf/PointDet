@@ -35,15 +35,13 @@ class ContextualCentroidPerception(nn.Module):
             ctr_offsets (B, K, D)
         """
         indices = self.sampling_layer(points, cls_preds)
-        sampled_points = masked_gather(points, indices)
+        ctr_origins = masked_gather(points, indices)
         features = masked_gather(features.transpose(1, 2), indices)
         features = features.transpose(1, 2)
 
         # Centroid prediction
         max_offset_limit = self.get_buffer("max_offset_limit")
-        max_offset_limit = max_offset_limit.repeat(
-            (sampled_points.size(0), sampled_points.size(1), 1)
-        )
+        max_offset_limit = max_offset_limit.repeat((ctr_origins.size(0), ctr_origins.size(1), 1))
 
         ctr_offsets = self.centroid_reg(features).transpose(1, 2)
         limited_ctr_offsets = torch.where(
@@ -53,5 +51,5 @@ class ContextualCentroidPerception(nn.Module):
         limited_ctr_offsets = torch.where(
             limited_ctr_offsets < min_offset_limit, min_offset_limit, limited_ctr_offsets
         )
-        ctr_preds = sampled_points + limited_ctr_offsets
-        return ctr_preds, ctr_offsets, sampled_points
+        ctr_preds = ctr_origins + limited_ctr_offsets
+        return ctr_preds, ctr_origins, ctr_offsets

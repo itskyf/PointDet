@@ -31,7 +31,8 @@ class PointResBinOriCoder:
         xg, yg, zg, dxg, dyg, dzg, rg, *cgs = torch.split(gt_boxes, 1, dim=-1)
         xa, ya, za = torch.split(points, 1, dim=-1)
 
-        anchor_sizes = mean_size[gt_labels]
+        # Label starts at 1 (inside dataset)
+        anchor_sizes = mean_size[gt_labels - 1]
         dxa, dya, dza = torch.split(anchor_sizes, 1, dim=-1)
         diagonal = torch.sqrt(dxa**2 + dya**2)
         xt = (xg - xa) / diagonal
@@ -65,6 +66,7 @@ class PointResBinOriCoder:
         xt, yt, zt, dxt, dyt, dzt = torch.split(box_encodings[..., :6], 1, dim=-1)
         xa, ya, za = torch.split(points, 1, dim=-1)
 
+        # Don't need to -1 since input is preds indices
         anchor_sizes = mean_size[pred_classes]
         dxa, dya, dza = torch.split(anchor_sizes, 1, dim=-1)
         diagonal = torch.sqrt(dxa**2 + dya**2)
@@ -82,7 +84,6 @@ class PointResBinOriCoder:
         bin_id_one_hot = functional.one_hot(bin_id, self.bin_size)
         bin_res = torch.sum(bin_res * bin_id_one_hot, dim=-1)
 
-        rg = bin_id.float() * self.bin_inter - np.pi + self.h_bin_inter
-        rg += bin_res * self.h_bin_inter
+        rg = bin_id * self.bin_inter - np.pi + self.h_bin_inter + bin_res * self.h_bin_inter
         rg = rg.unsqueeze(-1)
         return torch.cat([xg, yg, zg, dxg, dyg, dzg, rg], dim=-1)

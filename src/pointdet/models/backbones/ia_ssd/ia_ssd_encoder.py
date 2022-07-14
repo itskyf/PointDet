@@ -68,6 +68,7 @@ class IASSDEncoder(nn.Module):
         """
         cls_preds = None
         cls_preds_list = []
+        # TODO critical return cls_preds_list?
         points_list = []
         for i, sa_module in enumerate(self.sa_modules):
             points, features = sa_module(points, features, cls_preds)

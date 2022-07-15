@@ -5,6 +5,40 @@
 # LICENSE file in the root directory of this source tree.
 import torch
 
+from ..core.bbox.structures.utils import rotation_3d_in_axis
+
+
+def boxes_to_corners_3d(boxes3d: torch.Tensor):
+    # TODO convert this function to LiDARBoxes3D's method
+    """
+        7 -------- 4
+       /|         /|
+      6 -------- 5 .
+      | |        | |
+      . 3 -------- 0
+      |/         |/
+      2 -------- 1
+    Args:
+        boxes3d:  (N, 7) [x, y, z, dx, dy, dz, heading], (x, y, z) is the box center
+
+    Returns:
+    """
+    template = [
+        [1, 1, -1],
+        [1, -1, -1],
+        [-1, -1, -1],
+        [-1, 1, -1],
+        [1, 1, 1],
+        [1, -1, 1],
+        [-1, -1, 1],
+        [-1, 1, 1],
+    ]
+    template = boxes3d.new_tensor(template) / 2
+
+    corners3d = boxes3d[:, None, 3:6].expand(-1, 8, -1) * template.unsqueeze(0)
+    corners3d = rotation_3d_in_axis(corners3d, boxes3d[:, 6], axis=2)
+    return corners3d + boxes3d[:, None, 0:3]
+
 
 def masked_gather(points: torch.Tensor, indices: torch.Tensor) -> torch.Tensor:
     """
@@ -51,3 +85,9 @@ def masked_gather(points: torch.Tensor, indices: torch.Tensor) -> torch.Tensor:
     # Replace padded values
     selected_points[idx_expanded_mask] = 0.0
     return selected_points
+
+
+def split_point_feats(points: torch.Tensor):
+    points_xyz = points[..., :3].contiguous()
+    features = points[..., 3:].transpose(1, 2).contiguous()
+    return points_xyz, features

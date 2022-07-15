@@ -1,0 +1,17 @@
+---
+defaults:
+  - _self_
+  - model: ???
+#  - override hydra/launcher: torchrun
+# hydra:
+#  mode: MULTIRUN
+
+disable_cuda: false
+num_workers: 2
+pcd_range: [0, -40, -3, 70.4, 40, 1]
+
+dataset:
+  _target_: pointdet.datasets.KittiDataset
+  classes: ${model.classes}
+  root: ${to_path:../data/kitti}
+  pts_prefix: velodyne_reduced

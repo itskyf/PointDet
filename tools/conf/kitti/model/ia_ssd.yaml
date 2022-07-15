@@ -1,0 +1,80 @@
+---
+augmentation:
+  _target_: pointdet.transforms.Compose
+  transforms:
+    - _target_: pointdet.transforms.PointsRangeFilter
+      point_cloud_range: ${pcd_range}
+    - _target_: pointdet.transforms.ObjectRangeFilter
+      point_cloud_range: ${pcd_range}
+    - _target_: pointdet.transforms.GTSampler
+      db_sampler:
+        _target_: pointdet.transforms.gt_sampling.DBSampler
+        root: ${dataset.root}
+        info_name: kitti_dbinfos_train.pkl
+        rate: 1.0
+        classes: ${model.classes}
+        min_points: { Car: 5, Pedestrian: 5, Cyclist: 5 }
+        sample_groups: { Car: 20, Pedestrian: 15, Cyclist: 15 }
+    - _target_: pointdet.transforms.RandomFlip3D
+      h_bev_flip_ratio: 0.5
+    - _target_: pointdet.transforms.ObjectNoise
+      translation_std: [1.0, 1.0, 0]
+      rot_range: [-1.0471975511965976, 1.0471975511965976] # pi / 3
+    - _target_: pointdet.transforms.GlobalRotScaleTrans
+    - _target_: pointdet.transforms.PointsSample
+      num_points: 16384
+
+classes: [Car, Pedestrian, Cyclist]
+batch_size: 8
+epoch: 80
+
+module:
+  _target_: pointdet.models.IASSDNet
+  encoder:
+    _target_: pointdet.models.backbones.ia_ssd.IASSDEncoder
+    in_channels: 1 # become 4 in encoder since xyz is concatenated
+    num_classes: ${len:${model.classes}}
+    num_points_list: [4096, 1024, 512]
+    sampling_methods: [D-FPS, D-FPS, CentroidAware]
+    num_neighbors_list: [[16, 32], [16, 32], [16, 32]]
+    radii_list: [[0.2, 0.8], [0.8, 1.6], [1.6, 4.8]]
+    mlps_channels_list:
+      - [[16, 16, 32], [32, 32, 64]]
+      - [[64, 64, 128], [64, 96, 128]]
+      - [[128, 128, 256], [128, 256, 256]]
+    aggregation_channels_list: [64, 128, 256]
+  vote_layer:
+    _target_: pointdet.models.backbones.ia_ssd.ContextualCentroidPerception
+    num_classes: ${len:${model.classes}}
+    num_points: 256
+    in_channels: ${..encoder.aggregation_channels_list[2]}
+    mid_channels: 128
+    max_translate_range: [3.0, 3.0, 2.0]
+  centroid_agg_layer:
+    _target_: pointdet.models.backbones.pointnet2.PointsAggregation
+    num_neighbors: [16, 32]
+    radii: [4.8, 6.4]
+    in_channels: ${..vote_layer.in_channels}
+    mlps_channels: [[256, 256, 512], [256, 512, 1024]]
+    aggregation_channels: 512
+  point_head:
+    _target_: pointdet.models.head.ia_ssd.IASSDHead
+    box_coder:
+      _target_: pointdet.core.bbox.coder.PointResBinOriCoder
+      bin_size: 12
+    in_channels: ${..centroid_agg_layer.aggregation_channels}
+    mid_channels: 256
+    num_classes: ${len:${model.classes}}
+    ext_dims:
+      - [0.2, 0.2, 0.2]
+      - [0.5, 0.5, 0.5]
+      - [1.0, 1.0, 1.0]
+    mean_size: [[3.9, 1.6, 1.56], [0.8, 0.6, 1.73], [1.76, 0.6, 1.73]]
+    extra_method: extend_gt
+  loss_weights:
+    classification: 1.0
+    corner: 1.0
+    direction: 0.2
+    ins_aware: [1.0, 1.0]
+    box_reg: 1.0
+    voting: 1.0

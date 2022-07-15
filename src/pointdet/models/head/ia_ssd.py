@@ -1,5 +1,5 @@
 import enum
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 import torch
 from torch import nn
@@ -17,16 +17,16 @@ class AssignType(enum.Enum):
 
 class Target(NamedTuple):
     # Tensors have shape [B, N]
-    pts_box_idx: torch.Tensor  # -1: background
-    pts_cls_label: torch.Tensor  # 0: background, -1: ignored
-    fg_pts_gt_box: torch.Tensor  # [sum_n_fg, 7]
-    fg_pts_box_label: list[torch.Tensor]  # [num_fg_points, 8 + C]
+    pt_box_indices: torch.Tensor  # -1: background
+    pt_cls_labels: torch.Tensor  # 0: background, -1: ignored
+    fg_pt_gt_boxes: torch.Tensor  # [sum_nfg, 7]
+    fg_pt_box_labels: Optional[torch.Tensor]
 
 
 class TrainTargets(NamedTuple):
     ctr: Target
-    sa_ins: list[Target]
     ctr_org: Target
+    sa_ins: list[Target]
 
 
 class IASSDHead(nn.Module):
@@ -57,7 +57,6 @@ class IASSDHead(nn.Module):
             nn.Conv1d(mid_channels, num_classes, kernel_size=1)
         )
 
-        self.fw_data: ForwardData
         self.register_buffer("gt_ext_dims", _ext_dims[0], persistent=False)
         self.register_buffer("sa_ext_dims", _ext_dims[1], persistent=False)
         self.register_buffer("ctr_org_ext_dims", _ext_dims[2], persistent=False)
@@ -66,15 +65,18 @@ class IASSDHead(nn.Module):
 
     def forward(
         self,
-        ctr_preds: torch.Tensor,
         ctr_feats: torch.Tensor,
+        ctr_preds: torch.Tensor,
+        ctr_origins: torch.Tensor,
+        sa_pts_list: list[torch.Tensor],
         gt_boxes_list: list[torch.Tensor],
         gt_labels_list: list[torch.Tensor],
-        points_list: list[torch.Tensor],
     ):
         """
         Args:
         Returns:
+            ctr_box_preds [N, B, bin_size]
+            pt_box_preds [N, B, 7]
         """
         ctr_box_preds = self.box_center_layer(ctr_feats).transpose(1, 2)
         pt_cls_preds = self.cls_center_layer(ctr_feats).transpose(1, 2)
@@ -85,25 +87,23 @@ class IASSDHead(nn.Module):
         )
 
         targets = (
-            self._assign_targets(ctr_preds, gt_boxes_list, gt_labels_list, points_list)
+            self._assign_targets(ctr_preds, ctr_origins, sa_pts_list, gt_boxes_list, gt_labels_list)
             if self.training
             else None
         )
-        return pt_cls_preds, pt_box_preds, targets
+        return ctr_box_preds, pt_cls_preds, pt_box_preds, targets
 
     def _assign_targets(
         self,
         ctr_preds: torch.Tensor,
+        ctr_origins: torch.Tensor,
+        sa_pts_list: list[torch.Tensor],
         gt_boxes_list: list[torch.Tensor],
         gt_labels_list: list[torch.Tensor],
-        points_list: list[torch.Tensor],
     ):
         """
         Args:
-            points_list: sampled points
         Returns:
-            target_dict:
-            ...
         """
         ctr_targets = self._assign_targets_stack(
             ctr_preds,
@@ -113,21 +113,9 @@ class IASSDHead(nn.Module):
             AssignType.IGNORE_FLAG,
             return_box_labels=True,
         )
-
-        sa_targets = [
-            self._assign_targets_stack(
-                points,
-                gt_boxes_list,
-                gt_labels_list,
-                self.get_buffer("sa_ext_dims"),
-                AssignType.IGNORE_FLAG if i == 0 else AssignType.EXTEND_GT,
-            )
-            for i, points in enumerate(points_list)
-        ]
-
         if self.extra_method == "extend_gt":
             ctr_org_targets = self._assign_targets_stack(
-                points_list[-1],
+                ctr_origins,
                 gt_boxes_list,
                 gt_labels_list,
                 self.get_buffer("ctr_org_ext_dims"),
@@ -136,7 +124,17 @@ class IASSDHead(nn.Module):
             )
         else:
             raise NotImplementedError
-        return TrainTargets(ctr_targets, sa_targets, ctr_org_targets)
+        sa_targets = [
+            self._assign_targets_stack(
+                points,
+                gt_boxes_list,
+                gt_labels_list,
+                self.get_buffer("sa_ext_dims"),
+                AssignType.IGNORE_FLAG if i == 0 else AssignType.EXTEND_GT,
+            )
+            for i, points in enumerate(sa_pts_list)
+        ]
+        return TrainTargets(ctr_targets, ctr_org_targets, sa_targets)
 
     def _assign_targets_stack(
         self,
@@ -152,60 +150,67 @@ class IASSDHead(nn.Module):
         Returns:
         """
         points_batch = points_batch.detach()
+        num_points = points_batch.size(1)
 
-        pts_box_idx_list = []
+        pt_box_indices_list = []
         pt_cls_labels_list = []
-        fg_pts_gt_boxes_list = []
-        fg_pts_box_label_list = []
+        fg_pt_gt_boxes_list = []
+        fg_pt_box_labels_list = [] if return_box_labels else None
 
         for points, gt_boxes, gt_labels in zip(points_batch, gt_boxes_list, gt_labels_list):
             u_boxes = gt_boxes.unsqueeze(0)
             u_points = points.unsqueeze(0)
 
             # 1, num_points
-            pts_box_idx = _C.points_in_boxes_part(u_boxes, u_points)
-            pts_box_idx = pts_box_idx.squeeze(0)
-            box_fg_flag = pts_box_idx != -1
+            pt_box_indices = _C.points_in_boxes_part(u_boxes, u_points)
+            pt_box_indices = pt_box_indices.squeeze(0)
+            box_fg_flag = pt_box_indices != -1
 
             # clone to not affect gt_boxes indexing below
             ext_gt_boxes = u_boxes.clone()
             ext_gt_boxes[..., 3:6] += ext_dims
-            pts_ext_box_idx = _C.points_in_boxes_part(ext_gt_boxes, u_points)
-            pts_ext_box_idx = pts_ext_box_idx.squeeze(0)
-            ext_fg_flag = pts_ext_box_idx != -1
+            pt_ext_box_indices = _C.points_in_boxes_part(ext_gt_boxes, u_points)
+            pt_ext_box_indices = pt_ext_box_indices.squeeze(0)
+            ext_fg_flag = pt_ext_box_indices != -1
 
-            pt_cls_labels = torch.zeros_like(pts_box_idx)
+            pt_cls_labels = torch.zeros_like(pt_box_indices)
             if assign_type is AssignType.IGNORE_FLAG:
                 fg_flag = box_fg_flag
                 ignore_flag = torch.logical_xor(box_fg_flag, ext_fg_flag)
                 pt_cls_labels[ignore_flag] = -1
             elif assign_type is AssignType.EXTEND_GT:
-                pts_ext_box_idx[box_fg_flag] = pts_box_idx[box_fg_flag]
+                pt_ext_box_indices[box_fg_flag] = pt_box_indices[box_fg_flag]
                 fg_flag = ext_fg_flag
-                pts_box_idx = pts_ext_box_idx
+                pt_box_indices = pt_ext_box_indices
             else:
                 raise NotImplementedError
-            pts_box_idx_list.append(pts_box_idx)
+            pt_box_indices_list.append(pt_box_indices)
 
-            pt_cls_labels[fg_flag] = gt_labels[pts_box_idx[fg_flag]]
+            pt_cls_labels[fg_flag] = gt_labels[pt_box_indices[fg_flag]]
             pt_cls_labels_list.append(pt_cls_labels)
 
             bg_flag = pt_cls_labels == 0
             fg_flag = torch.logical_xor(fg_flag, fg_flag & bg_flag)
 
-            fg_pts_box_idx = pts_box_idx[fg_flag]
-            fg_pts_gt_boxes = gt_boxes[fg_pts_box_idx]
-            fg_pts_gt_boxes_list.append(fg_pts_gt_boxes)
+            fg_pt_box_indices = pt_box_indices[fg_flag]
+            fg_pt_gt_boxes = gt_boxes[fg_pt_box_indices]
+            fg_pt_gt_boxes_list.append(fg_pt_gt_boxes)
 
-            if return_box_labels:
-                fg_pts_gt_labels = gt_labels[fg_pts_box_idx]
-                fg_pts_box_label = self.box_coder.encode_torch(
-                    points[fg_flag], fg_pts_gt_boxes, fg_pts_gt_labels, self.get_buffer("mean_size")
-                )
-                # TODO medium
-                fg_pts_box_label_list.append(fg_pts_box_label)
+            if fg_pt_box_labels_list is not None:
+                fg_pt_box_labels = u_boxes.new_zeros((num_points, 8))
+                if fg_pt_gt_boxes.size(0) > 0:
+                    fg_pt_box_labels[fg_flag] = self.box_coder.encode_torch(
+                        points[fg_flag],
+                        fg_pt_gt_boxes,
+                        gt_labels[fg_pt_box_indices],
+                        self.get_buffer("mean_size"),
+                    )
+                fg_pt_box_labels_list.append(fg_pt_box_labels)
 
-        pts_box_idx = torch.stack(pts_box_idx_list)
+        pt_box_indices = torch.stack(pt_box_indices_list)
         pt_cls_labels = torch.stack(pt_cls_labels_list)
-        fg_pts_gt_boxes = torch.cat(fg_pts_gt_boxes_list)
-        return Target(pts_box_idx, pt_cls_labels, fg_pts_gt_boxes, fg_pts_box_label_list)
+        fg_pt_gt_boxes = torch.cat(fg_pt_gt_boxes_list)
+        fg_pt_box_labels = (
+            torch.stack(fg_pt_box_labels_list) if fg_pt_box_labels_list is not None else None
+        )
+        return Target(pt_box_indices, pt_cls_labels, fg_pt_gt_boxes, fg_pt_box_labels)

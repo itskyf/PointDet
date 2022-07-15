@@ -12,6 +12,7 @@ def centroid_aware(cls_features: torch.Tensor, num_points: int) -> torch.Tensor:
     Returns:
         indices (B, num_points)
     """
+    cls_features = cls_features.transpose(1, 2)
     cls_features_max = cls_features.max(dim=-1).values
     score_pred = torch.sigmoid(cls_features_max)
     out = torch.topk(score_pred, num_points, dim=-1)

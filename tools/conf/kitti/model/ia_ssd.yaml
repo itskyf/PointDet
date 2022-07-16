@@ -24,9 +24,9 @@ augmentation:
     - _target_: pointdet.transforms.PointsSample
       num_points: 16384
 
-classes: [Car, Pedestrian, Cyclist]
+classes: ${classes}
 batch_size: 8
-epoch: 80
+epochs: 80
 
 module:
   _target_: pointdet.models.IASSDNet
@@ -78,3 +78,14 @@ module:
     ins_aware: [1.0, 1.0]
     box_reg: 1.0
     voting: 1.0
+
+clip_max_norm: 10
+optimizer:
+  _target_: torch.optim.Adam
+  lr: 0.01
+  betas: [0.9, 0.99]
+  weight_decay: 0.01
+lr_scheduler:
+  max_lr: ${..optimizer.lr}
+  pct_start: 0.4
+  div_factor: 10

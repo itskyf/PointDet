@@ -291,7 +291,6 @@ def surface_equ_3d(polygon_surfaces):
     surface_vec = polygon_surfaces[:, :, :2, :] - polygon_surfaces[:, :, 1:3, :]
     # normal_vec: [..., 3]
     normal_vec = np.cross(surface_vec[:, :, 0, :], surface_vec[:, :, 1, :])
-    # print(normal_vec.shape, points[..., 0, :].shape)
     # d = -np.inner(normal_vec, points[..., 0, :])
     direction = np.einsum("aij, aij->ai", normal_vec, polygon_surfaces[:, :, 0, :])
     return normal_vec, np.negative(direction)

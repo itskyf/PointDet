@@ -3,13 +3,19 @@ defaults:
   - _self_
   - model: ???
 #  - override hydra/launcher: torchrun
-# hydra:
-#  mode: MULTIRUN
+hydra:
+  #  mode: MULTIRUN
+  run:
+    dir: ${run_dir:outputs/${hydra.runtime.choices.model},${ckpt},${experiment}}
 
+ckpt: null
+experiment: null
 disable_cuda: false
 num_workers: 2
-pcd_range: [0, -40, -3, 70.4, 40, 1]
+save_interval: 2
 
+classes: [Car, Pedestrian, Cyclist]
+pcd_range: [0, -40, -3, 70.4, 40, 1]
 dataset:
   _target_: pointdet.datasets.KittiDataset
   classes: ${model.classes}

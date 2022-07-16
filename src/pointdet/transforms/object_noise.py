@@ -101,7 +101,6 @@ def _noise_per_box(boxes, valid_mask, loc_noises, rot_noises):
     current_corners = np.zeros((4, 2), dtype=boxes.dtype)
     rot_mat_t = np.zeros((2, 2), dtype=boxes.dtype)
     success_mask = -np.ones(num_boxes, dtype=np.int32)
-    # print(valid_mask)
     for i in range(num_boxes):
         if valid_mask[i]:
             for j in range(num_tests):

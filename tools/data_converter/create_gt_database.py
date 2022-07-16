@@ -54,7 +54,9 @@ def create_groundtruth_database(
     database_dir.mkdir()
 
     if dataset_enum is DatasetEnum.KITTI:
-        dataset = KittiDataset(root, "train", "velodyne_pt", info_prefix)
+        dataset = KittiDataset(
+            ["Car", "Pedestrian", "Cyclist"], root, "train", "velodyne_pt", info_prefix
+        )
     else:
         raise NotImplementedError
 

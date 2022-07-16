@@ -12,7 +12,7 @@ RUN micromamba install -y -n base -c nvidia/label/cuda-11.6.2 -c conda-forge \
 ARG CUDA_ARCH
 ARG MAMBA_DOCKERFILE_ACTIVATE=1
 RUN cd ~ && git clone --depth 1 https://github.com/itskyf/PointDet &&\
-	TORCH_CUDA_ARCH_LIST=$CUDA_ARCH pip install \
+	TORCH_CUDA_ARCH_LIST="$CUDA_ARCH" FORCE_CUDA=1 pip install \
 	--no-build-isolation --no-cache-dir --no-deps --upgrade --editable ./PointDet &&\
 	rm -rf ./PointDet/build
 

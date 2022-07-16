@@ -5,7 +5,14 @@ build-backend = 'setuptools.build_meta'
 [project]
 name = 'pointdet'
 authors = [{ email = 'itskyf@outlook.com', name = 'Ky Anh' }]
-dependencies = ['tensorboard', 'torch', 'tqdm']
+dependencies = [
+  'hydra-core',
+  'numba',
+  'scipy',       # for numba linear algebra
+  'pytorch',
+  'tensorboard',
+  'tqdm',
+]
 version = '0.0.0'
 
 [tool.black]

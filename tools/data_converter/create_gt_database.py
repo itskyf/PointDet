@@ -62,7 +62,7 @@ def create_groundtruth_database(
 
     group_counter = 0
     db_infos: defaultdict[str, list[DBInfo]] = defaultdict(list)
-    for i in trange(len(dataset), desc="GT database"):
+    for i in trange(len(dataset), desc="GT database", dynamic_ncols=True):
         # Use get_sample to avoid randomly sampled when there is no GT box
         pcd = dataset.get_sample(i)
         assert pcd.annos is not None

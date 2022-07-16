@@ -60,11 +60,11 @@ def main(cfg: omegaconf.DictConfig):
     best_loss = float("inf")
     cur_step = cur_epoch * len(train_loader)
     model.train()
-    for epoch in trange(cur_epoch, cfg.model.epochs, desc="Epoch"):
+    for epoch in trange(cur_epoch, cfg.model.epochs, desc="Epoch", dynamic_ncols=True):
         loss = None
         losses_dict = {}
 
-        for pcd_batch in tqdm(train_loader, desc="Step"):
+        for pcd_batch in tqdm(train_loader, desc="Step", dynamic_ncols=True, leave=False):
             cur_step += 1
             optimizer.zero_grad(set_to_none=True)
 

@@ -9,7 +9,7 @@ dependencies = [
   'hydra-core',
   'numba',
   'scipy',       # for numba linear algebra
-  'pytorch',
+  'torch',
   'tensorboard',
   'tqdm',
 ]

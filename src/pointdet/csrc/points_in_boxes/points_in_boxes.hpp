@@ -4,7 +4,7 @@
 // TODO CPU implementation
 //
 at::Tensor PointsInBoxesPartCuda(const at::Tensor& boxes, const at::Tensor& points,
-                             const int batch_size, const int num_boxes, const int num_points);
+                                 const int batch_size, const int num_boxes, const int num_points);
 
 inline at::Tensor PointsInBoxesPart(const at::Tensor& boxes, const at::Tensor& points) {
   const int batch_size = boxes.size(0), num_boxes = boxes.size(1);
@@ -18,7 +18,8 @@ inline at::Tensor PointsInBoxesPart(const at::Tensor& boxes, const at::Tensor& p
 #ifdef WITH_CUDA
     CHECK_CUDA(boxes);
     CHECK_CUDA(points);
-    return PointsInBoxesPartCuda(boxes, points, batch_size, num_boxes, num_points);
+    return PointsInBoxesPartCuda(boxes.contiguous(), points.contiguous(), batch_size, num_boxes,
+                                 num_points);
 #endif
   }
   AT_ERROR("Not compiled with GPU support");

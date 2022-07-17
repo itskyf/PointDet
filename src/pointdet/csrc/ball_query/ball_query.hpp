@@ -26,8 +26,8 @@ inline at::Tensor BallQuery(const at::Tensor& centroids, const at::Tensor& point
 #ifdef WITH_CUDA
     CHECK_CUDA(centroids);
     CHECK_CUDA(points);
-    return BallQueryCuda(centroids, points, batch_size, num_groups, num_neighbors, total_points,
-                         radius2);
+    return BallQueryCuda(centroids.contiguous(), points.contiguous(), batch_size, num_groups,
+                         num_neighbors, total_points, radius2);
 #endif
   }
   AT_ERROR("Not compiled with GPU support");

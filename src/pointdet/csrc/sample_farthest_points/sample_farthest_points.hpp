@@ -13,7 +13,7 @@ inline at::Tensor FarthestPointSampling(const at::Tensor& points, const int num_
   if (points.is_cuda()) {
 #ifdef WITH_CUDA
     CHECK_CUDA(points);
-    return FarthestPointSamplingCuda(points, batch_size, total_points, num_points);
+    return FarthestPointSamplingCuda(points.contiguous(), batch_size, total_points, num_points);
 #endif
   }
   AT_ERROR("Not compiled with GPU support");

@@ -16,7 +16,7 @@ def build_normal_mlps(
     next(c_outs, None)
     return list(
         chain.from_iterable(
-            [conv(c_in, c_out, kernel_size=1, bias=False), bn(c_out), nn.ReLU(inplace=True)]
+            [conv(c_in, c_out, kernel_size=1, bias=False), bn(c_out), nn.ReLU()]
             for c_in, c_out in zip(c_ins, c_outs)
         )
     )

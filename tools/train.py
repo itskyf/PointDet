@@ -62,7 +62,7 @@ def main(cfg: omegaconf.DictConfig):
     model.train()
     for epoch in trange(cur_epoch, cfg.model.epochs, desc="Epoch", dynamic_ncols=True):
         loss = None
-        losses_dict = {}
+        losses_dict_float = {}
 
         for pcd_batch in tqdm(train_loader, desc="Step", dynamic_ncols=True, leave=False):
             cur_step += 1
@@ -79,17 +79,19 @@ def main(cfg: omegaconf.DictConfig):
             optimizer.step()
             scheduler.step()
 
-        assert loss is not None and losses_dict
-        loss = loss.item()
-        losses_dict_float = {key: val.item() for key, val in losses_dict.items()}
+            assert loss is not None and losses_dict
+            loss = loss.item()
+            losses_dict_float = {key: val.item() for key, val in losses_dict.items()}
 
-        tb_writer.add_scalar("train/loss", loss, cur_step)
-        for key, val in losses_dict_float.items():
-            tb_writer.add_scalar(f"train/{key}_loss", val, cur_step)
-        if loss < best_loss:
-            best_loss = loss
-            state.save(epoch, losses_dict_float, "ckpt_best_loss.pt")
-        if epoch % cfg.save_interval == cfg.save_interval - 1:
+            if cur_step % cfg.log_interval == cfg.log_interval - 1:
+                tb_writer.add_scalar("train/loss", loss, cur_step)
+                for key, val in losses_dict_float.items():
+                    tb_writer.add_scalar(f"train/{key}_loss", val, cur_step)
+            if loss < best_loss:
+                best_loss = loss
+                state.save(epoch, losses_dict_float, "ckpt_best_loss.pt")
+
+        if epoch % cfg.save_interval == cfg.save_interval:
             state.save(epoch, losses_dict_float)
 
     tb_writer.close()

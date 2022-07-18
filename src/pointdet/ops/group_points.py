@@ -82,14 +82,16 @@ class GroupingOperation(Function):
     def forward(ctx, features: torch.Tensor, indices: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            features (Tensor): (B, feat_dims, num_feats) tensor of features to group.
-            indices (Tensor): (B, P1, K) the indices of features to group with.
+            features (Tensor): (B, C, N) tensor of features to group.
+            indices (Tensor): (B, K, num_neighbors) the indices of features to group with.
         Returns:
             (B, C, K, num_neighbors) Grouped features.
         """
-        grouped_feats = _C.group_points(features, indices)
-        ctx.for_backwards = (indices, features.size(2))
-        return grouped_feats
+        # B5, C 128, N 32
+        # K16, num_neight 8
+        num_feats = features.size(2)
+        ctx.for_backwards = (indices, num_feats)
+        return _C.group_points(features, indices)
 
     @staticmethod
     def backward(ctx, grad_grouped: torch.Tensor):
@@ -101,7 +103,8 @@ class GroupingOperation(Function):
             (B, C, N) gradient of the features.
         """
         indices, num_feats = ctx.for_backwards
-        grad_feats = _C.group_points_backward(grad_grouped.data, indices, num_feats)
+        grad_feats: torch.Tensor = _C.group_points_backward(grad_grouped.data, indices, num_feats)
+        grad_feats.requires_grad_(True)
         return grad_feats, None
 
 

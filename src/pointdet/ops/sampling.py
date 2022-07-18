@@ -33,7 +33,7 @@ class FarthestPointSampling(Function):
         Returns:
             torch.Tensor: (B, num_points) indices of the sampled points.
         """
-        indices = _C.sample_farthest_points(points, num_points)
+        indices: torch.Tensor = _C.sample_farthest_points(points, num_points)
         ctx.mark_non_differentiable(indices)
         return indices
 

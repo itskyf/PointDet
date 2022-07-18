@@ -162,14 +162,14 @@ class IASSDHead(nn.Module):
             u_points = points.unsqueeze(0)
 
             # 1, num_points
-            pt_box_indices = _C.points_in_boxes_part(u_boxes, u_points)
+            pt_box_indices: torch.Tensor = _C.points_in_boxes_part(u_boxes, u_points)
             pt_box_indices = pt_box_indices.squeeze(0)
             box_fg_flag = pt_box_indices != -1
 
             # clone to not affect gt_boxes indexing below
             ext_gt_boxes = u_boxes.clone()
             ext_gt_boxes[..., 3:6] += ext_dims
-            pt_ext_box_indices = _C.points_in_boxes_part(ext_gt_boxes, u_points)
+            pt_ext_box_indices: torch.Tensor = _C.points_in_boxes_part(ext_gt_boxes, u_points)
             pt_ext_box_indices = pt_ext_box_indices.squeeze(0)
             ext_fg_flag = pt_ext_box_indices != -1
 

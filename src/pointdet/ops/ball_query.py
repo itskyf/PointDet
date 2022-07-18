@@ -21,7 +21,7 @@ class BallQuery(autograd.Function):
         """
         Arguments defintions the same as in the ball_query function
         """
-        indices = _C.ball_query(centroids, points, num_neighbors, radius)
+        indices: torch.Tensor = _C.ball_query(centroids, points, num_neighbors, radius)
         ctx.mark_non_differentiable(indices)
         return indices
 
